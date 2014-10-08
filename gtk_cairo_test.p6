@@ -1,4 +1,5 @@
 use GTK::Simple;
+use GTK::GDK;
 use Cairo;
 use NativeCall;
 
@@ -43,7 +44,18 @@ my @star_surfaces = do for ^4 -> $chunk {
 my int $px = W div 2;
 my int $py = H * 4 div 5;
 
-$da.events.set(KEY_PRESS_MASK, KEY_RELEASE_MASK);
+$app.events.set(KEY_PRESS_MASK, KEY_RELEASE_MASK);
+
+$app.signal_supply("key-press-event").act(
+    -> @ ($widget, $raw_event) {
+        my $event = nqp::box_i($raw_event.Int, GdkEvent);
+        say "$widget, $event";
+        say "press event: $event.keycode() $event.keyval()";
+
+        CATCH {
+            say $_
+        }
+    });
 
 $da.add_draw_handler(
     -> $widget, $ctx {
@@ -80,12 +92,9 @@ $da.add_draw_handler(
 
         $widget.queue_draw;
 
-        say "drawn in { nqp::time_n() - $start } s";
-
         CATCH {
             say $_
         }
     });
-
 
 $app.run();
