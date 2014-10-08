@@ -4,7 +4,7 @@ use NativeCall;
 
 gtk_simple_use_cairo;
 
-my GTK::Simple::App $app .= new: title => "Draw on me!";
+my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
 
 $app.set_content(
     my $da = GTK::Simple::DrawingArea.new()
@@ -19,18 +19,22 @@ my Int @star_x = (0..800).roll(STARCOUNT);
 my Int @star_y = (0..600).roll(STARCOUNT);
 
 my @star_surfaces = do for ^4 -> $chunk {
-        Cairo::RecordingSurface.record(-> $ctx {
-            $ctx.rectangle(0, 0, 800, 600);
-            $ctx.rgba(0, 0, 0, 0);
-            $ctx.fill();
-            $ctx.line_cap = LINE_CAP_ROUND;
-            $ctx.rgba(my $brightness = 1 - $chunk * 0.2, $brightness, $brightness, 1);
-            for ^CHUNKSIZE {
-                $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE]);
-                $ctx.line_to(0, 0, :relative);
-                $ctx.stroke;
-            }
-        }, :content(CONTENT_COLOR_ALPHA))
+        my $tgt = Cairo::Image.create(FORMAT_A8, 800, 1200);
+        my $ctx = Cairo::Context.new($tgt);
+
+        $ctx.line_cap = LINE_CAP_ROUND;
+        $ctx.rgba(1, 1, 1, 1 - $chunk * 0.2);
+        for ^CHUNKSIZE {
+            $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE]);
+            $ctx.line_to(0, 0, :relative);
+            $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE] + 600);
+            $ctx.line_to(0, 0, :relative);
+            $ctx.stroke;
+        }
+
+        $tgt.reference();
+        $ctx.destroy();
+        $tgt;
     }
 
 my int $px = 400;
@@ -45,19 +49,18 @@ $da.add_draw_handler(
         $ctx.rectangle(0, 0, $w, $h);
         $ctx.fill();
 
-        my @yoffs  = (nqp::time_n() <<*<< (100, 80, 50, 15)) >>%>> 600;
+        my @yoffs  = (nqp::time_n() <<*<< (10, 8, 5, 1.5)) >>%>> 600 >>->> 600;
 
         for @star_surfaces Z @yoffs -> $surf, $yoffs {
             $ctx.save();
-            $ctx.set_source_surface($surf, 0, $yoffs);
-            $ctx.paint();
-            $ctx.translate(0, -600);
-            $ctx.paint();
+            $ctx.rgba(1, 1, 1, 1);
+            $ctx.mask($surf, 0, $yoffs);
+            $ctx.fill();
             $ctx.restore();
         }
 
         $ctx.translate($px, $py);
-        $ctx.scale(0.5, 0.5);
+        $ctx.scale(0.3, 0.3);
         $ctx.line_width = 8;
         $ctx.rgb(1, 1, 1);
 
