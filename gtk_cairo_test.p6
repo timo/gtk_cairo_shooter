@@ -15,19 +15,22 @@ $app.size_request(800, 600);
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
-my Int @star_x = (0..800).roll(STARCOUNT);
-my Int @star_y = (0..600).roll(STARCOUNT);
+constant W = 800;
+constant H = 600;
+
+my Int @star_x = (0..W).roll(STARCOUNT);
+my Int @star_y = (0..H).roll(STARCOUNT);
 
 my @star_surfaces = do for ^4 -> $chunk {
-        my $tgt = Cairo::Image.create(FORMAT_A8, 800, 1200);
+        my $tgt = Cairo::Image.create(FORMAT_A8, W, 2 * H);
         my $ctx = Cairo::Context.new($tgt);
 
         $ctx.line_cap = LINE_CAP_ROUND;
-        $ctx.rgba(1, 1, 1, 1 - $chunk * 0.2);
+        $ctx.rgba(1, 1, 1, 1);
         for ^CHUNKSIZE {
             $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE]);
             $ctx.line_to(0, 0, :relative);
-            $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE] + 600);
+            $ctx.move_to(@star_x[$_ + $chunk * CHUNKSIZE], @star_y[$_ + $chunk * CHUNKSIZE] + H);
             $ctx.line_to(0, 0, :relative);
             $ctx.stroke;
         }
@@ -37,24 +40,27 @@ my @star_surfaces = do for ^4 -> $chunk {
         $tgt;
     }
 
-my int $px = 400;
-my int $py = 500;
+my int $px = W div 2;
+my int $py = H * 4 div 5;
+
+$da.events.set(KEY_PRESS_MASK, KEY_RELEASE_MASK);
 
 $da.add_draw_handler(
     -> $widget, $ctx {
         my $start = nqp::time_n();
 
-        my ($w, $h) = 800, 600;
         $ctx.rgba(0, 0, 0, 1);
-        $ctx.rectangle(0, 0, $w, $h);
+        $ctx.rectangle(0, 0, W, H);
         $ctx.fill();
 
-        my @yoffs  = (nqp::time_n() <<*<< (10, 8, 5, 1.5)) >>%>> 600 >>->> 600;
+        my $ft = nqp::time_n();
 
-        for @star_surfaces Z @yoffs -> $surf, $yoffs {
+        my @yoffs  = do (nqp::time_n() * $_) % H - H for (100, 80, 50, 15);
+
+        for ^4 {
             $ctx.save();
-            $ctx.rgba(1, 1, 1, 1);
-            $ctx.mask($surf, 0, $yoffs);
+            $ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
+            $ctx.mask(@star_surfaces[$_], 0, @yoffs[$_]);
             $ctx.fill();
             $ctx.restore();
         }
@@ -74,7 +80,7 @@ $da.add_draw_handler(
 
         $widget.queue_draw;
 
-        #say "drawn in { nqp::time_n() - $start } s";
+        say "drawn in { nqp::time_n() - $start } s";
 
         CATCH {
             say $_
