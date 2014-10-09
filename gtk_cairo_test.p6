@@ -94,7 +94,7 @@ class Bullet is rw {
 }
 
 my @bullets;
-my $nextreload;
+my num $nextreload = 0;
 
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
@@ -127,6 +127,8 @@ $app.g_timeout(1000 / 50).act(
         }
     });
 
+my @frametimes;
+
 $da.add_draw_handler(
     -> $widget, $ctx {
         my $start = nqp::time_n();
@@ -147,6 +149,17 @@ $da.add_draw_handler(
             $ctx.restore();
         }
 
+        $ctx.save();
+        $ctx.rgba(0, 0, 1, 0.75);
+        $ctx.line_width = 8;
+
+        for @bullets {
+            $ctx.move_to($_.pos.re, $_.pos.im);
+            $ctx.line_to(0, -16) :relative;
+        }
+        $ctx.stroke();
+        $ctx.restore();
+
         $ctx.save;
         $ctx.translate($px, $py);
         $ctx.scale(0.3, 0.3);
@@ -162,16 +175,7 @@ $da.add_draw_handler(
         $ctx.fill;
         $ctx.restore();
 
-        $ctx.save();
-        $ctx.rgba(0, 0, 1, 0.75);
-        $ctx.line_width = 8;
-
-        for @bullets {
-            $ctx.move_to($_.pos.re, $_.pos.im);
-            $ctx.line_to(0, -16) :relative;
-        }
-        $ctx.stroke();
-        $ctx.restore();
+        @frametimes.push: nqp::time_n() - $start;
 
         CATCH {
             say $_
@@ -179,3 +183,9 @@ $da.add_draw_handler(
     });
 
 $app.run();
+
+say "analysis of frame times incoming";
+@frametimes .= sort;
+
+say "{+@frametimes} frames rendered";
+(@frametimes[0], @frametimes[* div 4], @frametimes[* div 2], @frametimes[* * 3 div 4], @frametimes[* - 1]).join(" ").say;
