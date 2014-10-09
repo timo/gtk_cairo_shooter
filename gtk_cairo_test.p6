@@ -24,7 +24,7 @@ my Int @star_y = (0..H).roll(STARCOUNT);
 
 my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
-        -> $ctx { 
+        -> $ctx {
             $ctx.line_cap = LINE_CAP_ROUND;
             $ctx.rgba(1, 1, 1, 1);
 
