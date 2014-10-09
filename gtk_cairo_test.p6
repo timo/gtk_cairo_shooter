@@ -129,6 +129,20 @@ $app.g_timeout(1000 / 50).act(
 
 my @frametimes;
 
+sub playership {
+    $ctx.scale(0.3, 0.3);
+    $ctx.line_width = 8;
+    $ctx.rgb(1, 1, 1);
+
+    $ctx.move_to(0, -64);
+    $ctx.line_to(32, 32);
+    $ctx.curve_to(20, 16, -20, 16, -32, 32);
+    $ctx.close_path();
+    $ctx.stroke :preserve;
+    $ctx.rgb(0.25, 0.25, 0.25);
+    $ctx.fill;
+}
+
 $da.add_draw_handler(
     -> $widget, $ctx {
         my $start = nqp::time_n();
@@ -162,17 +176,7 @@ $da.add_draw_handler(
 
         $ctx.save;
         $ctx.translate($px, $py);
-        $ctx.scale(0.3, 0.3);
-        $ctx.line_width = 8;
-        $ctx.rgb(1, 1, 1);
-
-        $ctx.move_to(0, -64);
-        $ctx.line_to(32, 32);
-        $ctx.curve_to(20, 16, -20, 16, -32, 32);
-        $ctx.close_path();
-        $ctx.stroke :preserve;
-        $ctx.rgb(0.25, 0.25, 0.25);
-        $ctx.fill;
+        playership();
         $ctx.restore();
 
         @frametimes.push: nqp::time_n() - $start;
