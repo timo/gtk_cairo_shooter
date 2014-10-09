@@ -108,7 +108,7 @@ $app.g_timeout(1000 / 50).act(
 
         if %down_keys<K_SPACE> {
             if $t > $nextreload {
-                @bullets.push(Bullet.new(:pos($px + $py * i), :vel(0 - 768i)));
+                @bullets.push(Bullet.new(:pos($px + $py\i), :vel(0 - 768i)));
                 $nextreload = $t + 0.3;
             }
         }
