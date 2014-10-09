@@ -94,7 +94,7 @@ class Bullet is rw {
 }
 
 my @bullets;
-my num $nextreload = 0;
+my $nextreload = 0;
 
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
