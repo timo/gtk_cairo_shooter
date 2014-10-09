@@ -188,4 +188,8 @@ say "analysis of frame times incoming";
 @frametimes .= sort;
 
 say "{+@frametimes} frames rendered";
-(@frametimes[0], @frametimes[* div 4], @frametimes[* div 2], @frametimes[* * 3 div 4], @frametimes[* - 1]).join(" ").say;
+my @timings = (@frametimes[* div 50], @frametimes[* div 4], @frametimes[* div 2], @frametimes[* * 3 div 4], @frametimes[* - * div 100]);
+say @timings;
+
+say "frames per second:";
+say 1 X/ @timings;
