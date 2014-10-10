@@ -5,7 +5,7 @@ use NativeCall;
 
 gtk_simple_use_cairo;
 
-sub MAIN($filename?) {
+sub MAIN($filename? is copy) {
     my GTK::Simple::App $app .= new: title => "Cairo Live-Coding environment";
 
     $app.set_content(
@@ -28,6 +28,8 @@ sub MAIN($filename?) {
     my $animation_last_t;
     my $animation_last_dt;
 
+    my $last_working_code_text;
+
     $codeview.changed.stable(1).start(
         -> $widget {
             my $code = $widget.text;
@@ -49,12 +51,13 @@ sub MAIN($filename?) {
             if defined &frame_callable {
                 GTK::Simple::Scheduler.cue( { $statuslabel.text = "Evaluation finished." } );
             }
+            $last_working_code_text = $code;
             &frame_callable
         }).migrate.act(-> &frame_callable {
             $frame_handler_channel.send(&frame_callable);
         });
 
-    $app.g_timeout(1000 / 30).act(
+    $app.g_timeout(1000 / 25).act(
         -> @ ($t, $dt) {
             winner * {
                 more $frame_handler_channel {
@@ -107,16 +110,18 @@ sub MAIN($filename?) {
     }
 
     signal(SIGINT).tap( {
-        say "Thank you for playing.";
-        my $filename = "session-{now}.p6";
-        $filename.IO.spurt($codeview.text);
-        say "you can find the code in $filename";
+        #say "Thank you for playing.";
+        #my $filename = "session-{now}.p6";
+        #$filename.IO.spurt($codeview.text);
+        #say "you can find the code in $filename";
         exit();
     });
 
     $app.run();
-    say "Thank you for playing.";
-    my $filename = "session-{now}.p6";
-    $filename.IO.spurt($codeview.text);
-    say "you can find the code in $filename";
+    END {
+        say "Thank you for playing.";
+        $filename = "session-{now}.p6";
+        $filename.IO.spurt($last_working_code_text);
+        say "you can find the code in $filename";
+    }
 }
