@@ -129,7 +129,7 @@ $app.g_timeout(1000 / 50).act(
 
 my @frametimes;
 
-sub playership {
+sub playership($ctx) {
     $ctx.scale(0.3, 0.3);
     $ctx.line_width = 8;
     $ctx.rgb(1, 1, 1);
@@ -176,7 +176,7 @@ $da.add_draw_handler(
 
         $ctx.save;
         $ctx.translate($px, $py);
-        playership();
+        $ctx.&playership();
         $ctx.restore();
 
         @frametimes.push: nqp::time_n() - $start;
