@@ -15,7 +15,10 @@ class Object is rw {
 my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
 
 $app.set_content(
-    my $da = GTK::Simple::DrawingArea.new()
+    GTK::Simple::HBox.new(
+        my $da = GTK::Simple::DrawingArea.new(),
+        GTK::Simple::DrawingArea.new()
+    )
 );
 
 constant STARCOUNT = 1000;
@@ -24,7 +27,12 @@ constant CHUNKSIZE = STARCOUNT div 4;
 constant W = 1024;
 constant H = 786;
 
-$app.size_request(W, H);
+constant SCALE = (1920 / 1024) min (1080 / 786);
+
+my $game_draw_handler;
+
+$app.size_request(W * SCALE, H * SCALE);
+$da.size_request(W * SCALE, H * SCALE);
 
 my Int @star_x = (0..W).roll(STARCOUNT);
 my Int @star_y = (0..H).roll(STARCOUNT);
@@ -97,6 +105,20 @@ $app.signal_supply("key-release-event").act(
 my @bullets;
 my @enemies;
 my $nextreload = 0;
+my @kills;
+
+sub game_over_screen($widget, $ctx) {
+    $ctx.scale(SCALE, SCALE);
+    my $edgelength = (@kills + 1).sqrt.ceiling;
+    $ctx.scale(700 / ($edgelength * 50), 700 / ($edgelength * 50));
+    $ctx.translate(50, 50);
+    for ^@kills {
+        $ctx.save();
+        $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
+        $ctx.&enemyship(@kills[$_]);
+        $ctx.restore();
+    }
+}
 
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
@@ -104,7 +126,9 @@ $app.g_timeout(1000 / 50).act(
         if $player.lifetime {
             $player.lifetime -= $dt;
             if $player.lifetime < 0 {
-                exit(0);
+                $game_draw_handler.disconnect();
+                $da.add_draw_handler(&game_over_screen);
+                @kills>>.lifetime = Num;
             }
         } else {
             if %down_keys<K_LEFT> {
@@ -116,7 +140,7 @@ $app.g_timeout(1000 / 50).act(
         }
 
         if %down_keys<K_SPACE> {
-            if $t > $nextreload {
+            if $t > $nextreload && !defined $player.lifetime {
                 @bullets.push(Object.new(:pos($player.pos), :vel(0 - 768i)));
                 $nextreload = $t + 0.3;
             }
@@ -125,7 +149,7 @@ $app.g_timeout(1000 / 50).act(
         for @bullets, @enemies {
             $_.pos += $dt * $_.vel;
         }
-        while @bullets and @bullets[0].pos.im < 0 {
+        while @bullets and (@bullets[0].pos.im < 0 or @bullets[0].pos.im > 800 or @bullets[0].pos.re < 0 or @bullets[0].pos.re > 1024) {
             @bullets.shift
         }
 
@@ -140,7 +164,14 @@ $app.g_timeout(1000 / 50).act(
                         $_.lifetime = 2e0;
                         $_.vel += $b.vel / 4;
                         $_.vel *= 4;
+                        if 100.rand > 50 {
+                            for ^4 {
+                                @bullets.push:
+                                    Object.new: :pos($b.pos), :vel(unpolar(768, (2 * pi).rand));
+                            }
+                        }
                         $b.pos -= 1000i;
+                        @kills.push($_);
                         last;
                     }
                 }
@@ -149,13 +180,13 @@ $app.g_timeout(1000 / 50).act(
                 }
 
                 if ($player.pos - $_.pos).polar[0] < 40 {
-                    $player.lifetime = 3e0;
+                    $player.lifetime //= 3e0;
                 }
             }
         }
         @enemies .= grep({ $_.pos.im < 790 && (!$_.lifetime || $_.lifetime > 0) });
 
-        if 100.rand >= 95 {
+        if 1000.rand >= 800 {
             @enemies.push: Object.new:
                 :pos(1000.rand + 12 - 15i),
                 :vel((100.rand - 50) + 128i);
@@ -175,13 +206,13 @@ sub playership($ctx, $ship) {
         $ctx.save();
         $ctx.push_group();
 
-        $ctx.rectangle(-$ship.pos.im * 3, -$ship.pos.re * 3, 1024 * 3, 786 * 3);
+        $ctx.rectangle(-$ship.pos.im * 4, -$ship.pos.re * 4, 1024 * 4, 786 * 4);
         $ctx.rgb(0, 0, 0);
         $ctx.fill();
 
         $ctx.rgb(1, 1, 1);
-        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
-        my $rad = ($ship.lifetime ** 4 + 0.001) * 30;
+        $ctx.rotate($ship.lifetime * 0.1);
+        my $rad = ($ship.lifetime ** 4 + 0.001) * 40;
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
         $ctx.move_to(0, 1);
@@ -203,7 +234,7 @@ sub playership($ctx, $ship) {
         $ctx.rgb(1, 1, 1);
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
-        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
+        $ctx.rotate($ship.lifetime * 0.1);
         $ctx.move_to(0, 1);
         for ^10 {
             my $pic = ($_ * pi * 2) / 10;
@@ -269,9 +300,11 @@ sub enemyship($ctx, $ship) {
     }
 }
 
-$da.add_draw_handler(
+$game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
         my $start = nqp::time_n();
+
+        $ctx.scale(SCALE, SCALE);
 
         $ctx.rgba(0, 0, 0, 1);
         $ctx.rectangle(0, 0, W, H);
@@ -295,7 +328,18 @@ $da.add_draw_handler(
 
         for @bullets {
             $ctx.move_to($_.pos.re, $_.pos.im);
-            $ctx.line_to(0, -16) :relative;
+            $ctx.line_to($_.vel.re * 0.05, $_.vel.im * 0.05) :relative;
+        }
+        $ctx.stroke();
+        $ctx.restore();
+
+        $ctx.save();
+        $ctx.rgb(1, 1, 1);
+        $ctx.line_width = 3;
+
+        for @bullets {
+            $ctx.move_to($_.pos.re, $_.pos.im);
+            $ctx.line_to($_.vel.re * 0.03, $_.vel.im * 0.03) :relative;
         }
         $ctx.stroke();
         $ctx.restore();
