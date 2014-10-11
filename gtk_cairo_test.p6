@@ -110,9 +110,13 @@ my @enemies;
 my $nextreload = 0;
 my @kills;
 
+my $explosion_background = 0;
+
 my $go_t;
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
+
+        $explosion_background -= $dt if $explosion_background > 0;
 
         if $player.lifetime {
             $player.lifetime -= $dt;
@@ -168,6 +172,7 @@ $app.g_timeout(1000 / 50).act(
                         }
                         $b.pos -= 1000i;
                         @kills.push($_);
+                        $explosion_background = 0.9 + 0.1.rand;
                         last;
                     }
                 }
@@ -298,7 +303,7 @@ sub enemyship($ctx, $ship) {
 
 sub game_over_screen($widget, $ctx) {
     $ctx.scale(SCALE, SCALE);
-    $ctx.rgb(0.1, 0.1, 0.1);
+    $ctx.rgb(0, 0, 0);
     $ctx.rectangle(0, 0, 1024, 786);
     $ctx.fill();
 
@@ -309,7 +314,7 @@ sub game_over_screen($widget, $ctx) {
         my $kill = @kills[$_];
         my $maybe = (nqp::time_n() - $go_t) * 3 - ($kill.id % ($edgelength * 3)) / 3;
         $maybe min= 1;
-        if $maybe >= 0 and $maybe <= 1 {
+        if $maybe >= 0 {
             $ctx.save();
             $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
             $ctx.scale($maybe, $maybe);
@@ -317,7 +322,7 @@ sub game_over_screen($widget, $ctx) {
             $ctx.restore();
         }
     }
-    
+
     CATCH {
         say $_
     }
@@ -329,7 +334,7 @@ $game_draw_handler = $da.add_draw_handler(
 
         $ctx.scale(SCALE, SCALE);
 
-        $ctx.rgba(0, 0, 0, 1);
+        $ctx.rgba(0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 1);
         $ctx.rectangle(0, 0, W, H);
         $ctx.fill();
 
