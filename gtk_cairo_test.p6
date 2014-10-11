@@ -203,6 +203,7 @@ sub playership($ctx, $ship) {
         $ctx.rgb(1, 1, 1);
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
+        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
         $ctx.move_to(0, 1);
         for ^10 {
             my $pic = ($_ * pi * 2) / 10;
