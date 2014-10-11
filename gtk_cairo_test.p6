@@ -12,6 +12,12 @@ class Object is rw {
     has Num $.lifetime;
 }
 
+class Enemy is Object is rw {
+    has Int $.HP;
+    has Complex @.trail;
+    has Num $.trail_emit_time = 0.1e0;
+}
+
 my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
 
 $app.set_content(
@@ -21,8 +27,8 @@ $app.set_content(
     )
 );
 
-constant REFRACT_PROB = 25;
-constant ENEMY_PROB = 20;
+constant REFRACT_PROB = 30;
+constant ENEMY_PROB = 5;
 
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
@@ -125,14 +131,15 @@ $app.g_timeout(1000 / 50).act(
                     $game_draw_handler.disconnect();
                     $da.add_draw_handler(&game_over_screen);
                     @kills>>.lifetime = Num;
+                    .HP = 0b11 for @kills;
                     $go_t = nqp::time_n();
                 }
             }
         } else {
-            if %down_keys<K_LEFT> {
+            if %down_keys<K_LEFT> && $player.pos.re > 20 {
                 $player.pos -= 512 * $dt;
             }
-            if %down_keys<K_RIGHT> {
+            if %down_keys<K_RIGHT> && $player.pos.re < 1004 {
                 $player.pos += 512 * $dt;
             }
         }
@@ -154,30 +161,63 @@ $app.g_timeout(1000 / 50).act(
         }
 
         for @enemies {
+            if $_.trail_emit_time < $t {
+                $_.trail.unshift: $_.pos;
+                $_.trail_emit_time = $t + 0.1;
+                if $_.trail > 6 {
+                    $_.trail.pop;
+                }
+            }
+
             $_.pos += $dt * $_.vel;
+
+            if $_.pos.re < 20 && $_.vel.re < 0 {
+                $_.vel = -$_.vel.re + $_.vel.im\i
+            }
+            if $_.pos.re > 1004 && $_.vel.re > 0 {
+                $_.vel = -$_.vel.re + $_.vel.im\i
+            }
+            if !defined $_.lifetime && $_.vel.im < 128 {
+                $_.vel += ($dt * 100)\i;
+                my $polarvel = $_.vel.polar;
+                $_.vel = unpolar($polarvel[0] min 128, $polarvel[1]);
+            }
             if $_.lifetime {
                 $_.lifetime -= $dt;
                 $_.vel *= 0.8;
             } else {
-                for @bullets -> $b {
-                    if ($_.pos - $b.pos).polar[0] < 30 {
-                        $_.lifetime = 2e0;
-                        $_.vel += $b.vel / 4;
-                        $_.vel *= 4;
-                        if 100.rand < REFRACT_PROB {
-                            for ^4 {
-                                @bullets.push:
-                                    Object.new: :pos($b.pos), :vel(unpolar(768, (2 * pi).rand));
+                if !defined $player.lifetime {
+                    for @bullets -> $b {
+                        my $posdiff   = ($_.pos - $b.pos);
+                        my $polardiff = $posdiff.polar;
+                        if $polardiff[0] < 30 {
+                            if $_.HP == 0 {
+                                $_.lifetime = 2e0;
+                                $_.vel += $b.vel / 4;
+                                $_.vel *= 4;
+                                if 100.rand < REFRACT_PROB {
+                                    for ^4 {
+                                        @bullets.push:
+                                            Object.new: :pos($b.pos), :vel(unpolar(768, (2 * pi).rand));
+                                    }
+                                }
+                                @kills.push($_);
+                                $explosion_background = 0.9 + 0.1.rand;
+                            } elsif $_.HP > 0 && $_.HP <= 0b11 {
+                                if $posdiff.re < 0 {
+                                    $_.HP +&= +^ 0b01;
+                                } else {
+                                    $_.HP +&= +^ 0b10;
+                                }
+                                $_.vel = $posdiff * 3;
+                                $_.vel -= 100i if $_.vel.im >= -50;
+                            } elsif $_.HP >= 0b11 {
+                                $_.HP--;
                             }
+                            $b.pos -= 1000i;
+                            last;
                         }
-                        $b.pos -= 1000i;
-                        @kills.push($_);
-                        $explosion_background = 0.9 + 0.1.rand;
-                        last;
                     }
-                }
-                if (1024.rand > 1000) {
-                    $_.vel = ((100.rand - 50) + 128i);
                 }
 
                 if ($player.pos - $_.pos).polar[0] < 40 {
@@ -188,9 +228,10 @@ $app.g_timeout(1000 / 50).act(
         @enemies .= grep({ $_.pos.im < 790 && (!$_.lifetime || $_.lifetime > 0) });
 
         if 100.rand < ENEMY_PROB {
-            @enemies.push: Object.new:
+            @enemies.push: Enemy.new:
                 :pos(1000.rand + 12 - 15i),
-                :vel((100.rand - 50) + 128i);
+                :vel((100.rand - 50) + 128i),
+                :HP(3);
         }
 
         $da.queue_draw;
@@ -263,9 +304,8 @@ sub playership($ctx, $ship) {
 }
 
 sub enemyship($ctx, $ship) {
-    $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
-
     if $ship.lifetime {
+        $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
         $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
         my $rad = ($ship.lifetime ** 4 + 0.001) * 5;
         $ctx.scale($rad, $rad);
@@ -281,14 +321,36 @@ sub enemyship($ctx, $ship) {
         $ctx.rgb(1, 0, 0);
         $ctx.stroke();
     } else {
+        my $polarvel = $ship.vel.polar;
+
+        if $ship.trail >= 1 {
+            $ctx.save();
+            $ctx.translate(-$ship.pos.re, -$ship.pos.im);
+            $ctx.move_to($ship.trail[0].re, $ship.trail[0].im);
+            $ctx.rgba(0, 0, 1, 0.1);
+            for $ship.trail -> $a {
+                $ctx.line_to($a.re, $a.im);
+                $ctx.stroke() :preserve;
+            }
+            $ctx.stroke();
+            $ctx.restore();
+        }
+
+        $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
+        $ctx.rotate($polarvel[1] - 0.5 * pi);
+
         $ctx.move_to(5, -15);
         $ctx.line_to(-5, -15);
-        $ctx.curve_to(-30, -15, -15, 15, -5, 15);
+        if $ship.HP >= 0b11 || $ship.HP +& 0b10 {
+            $ctx.curve_to(-30, -15, -15, 15, -5, 15);
+        }
         $ctx.line_to(-3, -5);
         $ctx.line_to(0, 5);
         $ctx.line_to(3, -5);
-        $ctx.line_to(5, 15);
-        $ctx.curve_to(15, 15, 30, -15, 5, -15);
+        if $ship.HP >= 3 || $ship.HP +& 0b01 {
+            $ctx.line_to(5, 15);
+            $ctx.curve_to(15, 15, 30, -15, 5, -15);
+        }
         $ctx.line_to(5, -15);
 
         $ctx.line_to(0, -5) :relative;
