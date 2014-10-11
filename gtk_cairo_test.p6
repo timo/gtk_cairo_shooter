@@ -21,6 +21,9 @@ $app.set_content(
     )
 );
 
+constant REFRACT_PROB = 25;
+constant ENEMY_PROB = 20;
+
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
@@ -107,28 +110,19 @@ my @enemies;
 my $nextreload = 0;
 my @kills;
 
-sub game_over_screen($widget, $ctx) {
-    $ctx.scale(SCALE, SCALE);
-    my $edgelength = (@kills + 1).sqrt.ceiling;
-    $ctx.scale(700 / ($edgelength * 50), 700 / ($edgelength * 50));
-    $ctx.translate(50, 50);
-    for ^@kills {
-        $ctx.save();
-        $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
-        $ctx.&enemyship(@kills[$_]);
-        $ctx.restore();
-    }
-}
-
+my $go_t;
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
 
         if $player.lifetime {
             $player.lifetime -= $dt;
             if $player.lifetime < 0 {
-                $game_draw_handler.disconnect();
-                $da.add_draw_handler(&game_over_screen);
-                @kills>>.lifetime = Num;
+                if $game_draw_handler.connected {
+                    $game_draw_handler.disconnect();
+                    $da.add_draw_handler(&game_over_screen);
+                    @kills>>.lifetime = Num;
+                    $go_t = nqp::time_n();
+                }
             }
         } else {
             if %down_keys<K_LEFT> {
@@ -149,7 +143,9 @@ $app.g_timeout(1000 / 50).act(
         for @bullets, @enemies {
             $_.pos += $dt * $_.vel;
         }
-        while @bullets and (@bullets[0].pos.im < 0 or @bullets[0].pos.im > 800 or @bullets[0].pos.re < 0 or @bullets[0].pos.re > 1024) {
+        while @bullets
+            and (@bullets[0].pos.im < 0 or @bullets[0].pos.im > 800
+                or @bullets[0].pos.re < 0 or @bullets[0].pos.re > 1024) {
             @bullets.shift
         }
 
@@ -164,7 +160,7 @@ $app.g_timeout(1000 / 50).act(
                         $_.lifetime = 2e0;
                         $_.vel += $b.vel / 4;
                         $_.vel *= 4;
-                        if 100.rand > 50 {
+                        if 100.rand < REFRACT_PROB {
                             for ^4 {
                                 @bullets.push:
                                     Object.new: :pos($b.pos), :vel(unpolar(768, (2 * pi).rand));
@@ -186,7 +182,7 @@ $app.g_timeout(1000 / 50).act(
         }
         @enemies .= grep({ $_.pos.im < 790 && (!$_.lifetime || $_.lifetime > 0) });
 
-        if 1000.rand >= 800 {
+        if 100.rand < ENEMY_PROB {
             @enemies.push: Object.new:
                 :pos(1000.rand + 12 - 15i),
                 :vel((100.rand - 50) + 128i);
@@ -297,6 +293,33 @@ sub enemyship($ctx, $ship) {
         $ctx.fill() :preserve;
         $ctx.rgb(1, 1, 1);
         $ctx.stroke();
+    }
+}
+
+sub game_over_screen($widget, $ctx) {
+    $ctx.scale(SCALE, SCALE);
+    $ctx.rgb(0.1, 0.1, 0.1);
+    $ctx.rectangle(0, 0, 1024, 786);
+    $ctx.fill();
+
+    my $edgelength = (@kills + 1).sqrt.ceiling;
+    $ctx.scale(700 / ($edgelength * 50), 700 / ($edgelength * 50));
+    $ctx.translate(50, 50);
+    for ^@kills {
+        my $kill = @kills[$_];
+        my $maybe = (nqp::time_n() - $go_t) * 3 - ($kill.id % ($edgelength * 3)) / 3;
+        $maybe min= 1;
+        if $maybe >= 0 and $maybe <= 1 {
+            $ctx.save();
+            $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
+            $ctx.scale($maybe, $maybe);
+            $ctx.&enemyship($kill);
+            $ctx.restore();
+        }
+    }
+    
+    CATCH {
+        say $_
     }
 }
 
