@@ -5,6 +5,13 @@ use NativeCall;
 
 gtk_simple_use_cairo;
 
+class Object is rw {
+    has Complex $.pos;
+    has Complex $.vel;
+    has Int $.id = (4096.rand).Int;
+    has Num $.lifetime;
+}
+
 my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
 
 $app.set_content(
@@ -42,8 +49,7 @@ my @star_surfaces = do for ^4 -> $chunk {
         }, W, 2 * H, FORMAT_A8);
     }
 
-my num $px = (W / 2).Num;
-my num $py = (H * 6 / 7).Num;
+my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i) );
 
 $app.events.set(KEY_PRESS_MASK, KEY_RELEASE_MASK);
 
@@ -88,36 +94,71 @@ $app.signal_supply("key-release-event").act(
         }
     });
 
-class Bullet is rw {
-    has Complex $.pos;
-    has Complex $.vel;
-}
-
 my @bullets;
+my @enemies;
 my $nextreload = 0;
 
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
 
-        if %down_keys<K_LEFT> {
-            $px = $px - 256 * $dt;
-        }
-        if %down_keys<K_RIGHT> {
-            $px = $px + 256 * $dt;
+        if $player.lifetime {
+            $player.lifetime -= $dt;
+            if $player.lifetime < 0 {
+                exit(0);
+            }
+        } else {
+            if %down_keys<K_LEFT> {
+                $player.pos -= 512 * $dt;
+            }
+            if %down_keys<K_RIGHT> {
+                $player.pos += 512 * $dt;
+            }
         }
 
         if %down_keys<K_SPACE> {
             if $t > $nextreload {
-                @bullets.push(Bullet.new(:pos($px + $py\i), :vel(0 - 768i)));
+                @bullets.push(Object.new(:pos($player.pos), :vel(0 - 768i)));
                 $nextreload = $t + 0.3;
             }
         }
 
-        for @bullets {
+        for @bullets, @enemies {
             $_.pos += $dt * $_.vel;
         }
         while @bullets and @bullets[0].pos.im < 0 {
             @bullets.shift
+        }
+
+        for @enemies {
+            $_.pos += $dt * $_.vel;
+            if $_.lifetime {
+                $_.lifetime -= $dt;
+                $_.vel *= 0.8;
+            } else {
+                for @bullets -> $b {
+                    if ($_.pos - $b.pos).polar[0] < 30 {
+                        $_.lifetime = 2e0;
+                        $_.vel += $b.vel / 4;
+                        $_.vel *= 4;
+                        $b.pos -= 1000i;
+                        last;
+                    }
+                }
+                if (1024.rand > 1000) {
+                    $_.vel = ((100.rand - 50) + 128i);
+                }
+
+                if ($player.pos - $_.pos).polar[0] < 40 {
+                    $player.lifetime = 3e0;
+                }
+            }
+        }
+        @enemies .= grep({ $_.pos.im < 790 && (!$_.lifetime || $_.lifetime > 0) });
+
+        if 100.rand >= 95 {
+            @enemies.push: Object.new:
+                :pos(1000.rand + 12 - 15i),
+                :vel((100.rand - 50) + 128i);
         }
 
         $da.queue_draw;
@@ -129,18 +170,102 @@ $app.g_timeout(1000 / 50).act(
 
 my @frametimes;
 
-sub playership($ctx) {
-    $ctx.scale(0.3, 0.3);
-    $ctx.line_width = 8;
-    $ctx.rgb(1, 1, 1);
+sub playership($ctx, $ship) {
+    if $ship.lifetime {
+        $ctx.save();
+        $ctx.push_group();
 
-    $ctx.move_to(0, -64);
-    $ctx.line_to(32, 32);
-    $ctx.curve_to(20, 16, -20, 16, -32, 32);
-    $ctx.close_path();
-    $ctx.stroke :preserve;
-    $ctx.rgb(0.25, 0.25, 0.25);
-    $ctx.fill;
+        $ctx.rectangle(-$ship.pos.im * 3, -$ship.pos.re * 3, 1024 * 3, 786 * 3);
+        $ctx.rgb(0, 0, 0);
+        $ctx.fill();
+
+        $ctx.rgb(1, 1, 1);
+        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
+        my $rad = ($ship.lifetime ** 4 + 0.001) * 30;
+        $ctx.scale($rad, $rad);
+        $ctx.line_width = 1 / $rad;
+        $ctx.move_to(0, 1);
+        for ^10 {
+            my $pic = ($_ * pi * 2) / 10;
+            $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
+            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+        }
+        $ctx.line_to(0, 1);
+        $ctx.operator = OPERATOR_XOR;
+        $ctx.fill();
+
+        $ctx.pop_group_to_source();
+        $ctx.paint();
+
+        $ctx.restore();
+
+        $ctx.operator = OPERATOR_OVER;
+        $ctx.rgb(1, 1, 1);
+        $ctx.scale($rad, $rad);
+        $ctx.line_width = 1 / $rad;
+        $ctx.move_to(0, 1);
+        for ^10 {
+            my $pic = ($_ * pi * 2) / 10;
+            $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
+            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+        }
+        $ctx.line_to(0, 1);
+        $ctx.stroke();
+    } else {
+        $ctx.scale(0.3, 0.3);
+        $ctx.line_width = 8;
+        $ctx.rgb(1, 1, 1);
+
+        $ctx.move_to(0, -64);
+        $ctx.line_to(32, 32);
+        $ctx.curve_to(20, 16, -20, 16, -32, 32);
+        $ctx.close_path();
+        $ctx.stroke :preserve;
+        $ctx.rgb(0.25, 0.25, 0.25);
+        $ctx.fill;
+    }
+    CATCH {
+        say $_
+    }
+}
+
+sub enemyship($ctx, $ship) {
+    $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
+
+    if $ship.lifetime {
+        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
+        my $rad = ($ship.lifetime ** 4 + 0.001) * 5;
+        $ctx.scale($rad, $rad);
+        $ctx.line_width = 1 / $rad;
+        $ctx.move_to(0, 1);
+        for ^10 {
+            my $pic = ($_ * pi * 2) / 10;
+            $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
+            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+        }
+        $ctx.line_to(0, 1);
+        $ctx.fill() :preserve;
+        $ctx.rgb(1, 0, 0);
+        $ctx.stroke();
+    } else {
+        $ctx.move_to(5, -15);
+        $ctx.line_to(-5, -15);
+        $ctx.curve_to(-30, -15, -15, 15, -5, 15);
+        $ctx.line_to(-3, -5);
+        $ctx.line_to(0, 5);
+        $ctx.line_to(3, -5);
+        $ctx.line_to(5, 15);
+        $ctx.curve_to(15, 15, 30, -15, 5, -15);
+        $ctx.line_to(5, -15);
+
+        $ctx.line_to(0, -5) :relative;
+        $ctx.line_to(-10, 0) :relative;
+        $ctx.line_to(0, 5) :relative;
+
+        $ctx.fill() :preserve;
+        $ctx.rgb(1, 1, 1);
+        $ctx.stroke();
+    }
 }
 
 $da.add_draw_handler(
@@ -174,9 +299,16 @@ $da.add_draw_handler(
         $ctx.stroke();
         $ctx.restore();
 
+        for @enemies {
+            $ctx.save();
+            $ctx.translate($_.pos.re, $_.pos.im);
+            $ctx.&enemyship($_);
+            $ctx.restore();
+        }
+
         $ctx.save;
-        $ctx.translate($px, $py);
-        $ctx.&playership();
+        $ctx.translate($player.pos.re, $player.pos.im);
+        $ctx.&playership($player);
         $ctx.restore();
 
         @frametimes.push: nqp::time_n() - $start;

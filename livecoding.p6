@@ -21,7 +21,6 @@ sub MAIN($filename? is copy) {
     $codeview.size_request(400, 550);
     $da.size_request(400, 550);
 
-    my $frame_handler_channel = Channel.new();
     my &frame_handler = -> *@ { };
 
     my $animation_start_time;
@@ -33,41 +32,27 @@ sub MAIN($filename? is copy) {
     $codeview.changed.stable(1).start(
         -> $widget {
             my $code = $widget.text;
-            say "in code change handler";
-            say $code.WHAT;
             my &frame_callable;
-            GTK::Simple::Scheduler.cue( { $statuslabel.text = "evaling the code now ..." } );
+            $statuslabel.text = "evaling the code now ...";
             try {
                 &frame_callable = EVAL $code;
 
                 CATCH {
                     say "error: $_";
-                    GTK::Simple::Scheduler.cue(
-                        {
-                            $statuslabel.text = "Eval failed: $_"
-                        });
+                    $statuslabel.text = "Eval failed: $_"
                 }
             }
             if defined &frame_callable {
-                GTK::Simple::Scheduler.cue( { $statuslabel.text = "Evaluation finished." } );
+                $statuslabel.text = "Evaluation finished.";
             }
             $last_working_code_text = $code;
             &frame_callable
         }).migrate.act(-> &frame_callable {
-            $frame_handler_channel.send(&frame_callable);
+            &frame_handler = &frame_callable;
         });
 
     $app.g_timeout(1000 / 25).act(
         -> @ ($t, $dt) {
-            winner * {
-                more $frame_handler_channel {
-                    say "new frame code loading";
-                    &frame_handler = $_;
-                    $animation_start_time = $t;
-                }
-                wait 0 { Nil }
-            };
-
             $animation_last_t  = $t;
             $animation_last_dt = $dt;
             $da.queue_draw;
