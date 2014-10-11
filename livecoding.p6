@@ -109,13 +109,8 @@ sub MAIN($filename? is copy) {
             ...
     }
 
-    signal(SIGINT).tap( {
-        #say "Thank you for playing.";
-        #my $filename = "session-{now}.p6";
-        #$filename.IO.spurt($codeview.text);
-        #say "you can find the code in $filename";
-        exit();
-    });
+    signal(SIGINT).tap(  { exit(); });
+    #signal(SIGTERM).tap( { exit(); });
 
     $app.run();
     END {
