@@ -145,7 +145,7 @@ $app.g_timeout(1000 / 50).act(
         if %down_keys<K_SPACE> {
             if $t > $nextreload && !defined $player.lifetime {
                 @bullets.push(Object.new(:pos($player.pos), :vel(0 - 768i)));
-                $nextreload = $t + 0.3;
+                $nextreload = $t + 0.1;
             }
         }
 
