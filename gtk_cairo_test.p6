@@ -14,8 +14,6 @@ class Object is rw {
 
 class Enemy is Object is rw {
     has Int $.HP;
-    has Complex @.trail;
-    has Num $.trail_emit_time = 0.1e0;
 }
 
 my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
@@ -161,14 +159,6 @@ $app.g_timeout(1000 / 50).act(
         }
 
         for @enemies {
-            if $_.trail_emit_time < $t {
-                $_.trail.unshift: $_.pos;
-                $_.trail_emit_time = $t + 0.1;
-                if $_.trail > 6 {
-                    $_.trail.pop;
-                }
-            }
-
             $_.pos += $dt * $_.vel;
 
             if $_.pos.re < 20 && $_.vel.re < 0 {
@@ -323,22 +313,19 @@ sub enemyship($ctx, $ship) {
     } else {
         my $polarvel = $ship.vel.polar;
 
-        if $ship.trail >= 1 {
-            $ctx.save();
-            $ctx.translate(-$ship.pos.re, -$ship.pos.im);
-            $ctx.move_to($ship.trail[0].re, $ship.trail[0].im);
-            $ctx.rgba(0, 0, 1, 0.1);
-            for $ship.trail -> $a {
-                $ctx.line_to($a.re, $a.im);
-                $ctx.stroke() :preserve;
-            }
-            $ctx.stroke();
-            $ctx.restore();
-        }
-
-        $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
         $ctx.rotate($polarvel[1] - 0.5 * pi);
 
+        $ctx.line_cap = LINE_CAP_ROUND;
+        for ^4 {
+            $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
+            $ctx.line_width = $_ ** 2;
+            $ctx.move_to(0, -13);
+            $ctx.line_to(0, -(1 / $_) * 50) :relative;
+            $ctx.stroke();
+        }
+
+        $ctx.line_width = 1;
+        $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
         $ctx.move_to(5, -15);
         $ctx.line_to(-5, -15);
         if $ship.HP >= 0b11 || $ship.HP +& 0b10 {
