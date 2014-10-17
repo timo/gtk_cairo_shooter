@@ -225,6 +225,7 @@ $app.g_timeout(1000 / 50).act(
 
                 if ($player.pos - $_.pos).polar[0] < 40 {
                     $player.lifetime //= 3e0;
+                    $explosion_background = 1e0;
                 }
             }
         }
@@ -429,7 +430,7 @@ $game_draw_handler = $da.add_draw_handler(
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
         $ctx.scale(SCALE, SCALE);
 
-        $ctx.rgba(0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 1);
+        $ctx.rgb(0.4 * $explosion_background ** 4, 0.3 * $explosion_background ** 4, 0.2 * $explosion_background ** 4);
         $ctx.rectangle(0, 0, W, H);
         $ctx.fill();
 
