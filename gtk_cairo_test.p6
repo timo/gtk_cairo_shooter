@@ -380,7 +380,7 @@ sub game_over_screen($widget, $ctx) {
     $ctx.scale(SCALE, SCALE);
 
     state $edgelength = (@kills + 1).sqrt.ceiling;
-    $ctx.scale(my $factor = (H - 100) / ($edgelength * 50), $factor);
+    $ctx.scale(state $factor = (H - 100) / ($edgelength * 50), $factor);
     $ctx.translate(50, 50);
     for ^@kills {
         my $kill = @kills[$_];
@@ -425,7 +425,6 @@ sub game_over_screen($widget, $ctx) {
 
 $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
-
         $ctx.save();
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
         $ctx.scale(SCALE, SCALE);
@@ -436,7 +435,11 @@ $game_draw_handler = $da.add_draw_handler(
 
         my $ft = nqp::time_n();
 
-        my @yoffs  = do (nqp::time_n() * $_) % H - H for (100, 80, 50, 15);
+        #my @yoffs  = do (nqp::time_n() * $_) % H - H for (100, 80, 50, 15);
+        my @yoffs  = (nqp::time_n() * 100) % H - H,
+                     (nqp::time_n() *  80) % H - H,
+                     (nqp::time_n() *  50) % H - H,
+                     (nqp::time_n() *  15) % H - H;
 
         for ^4 {
             $ctx.save();
