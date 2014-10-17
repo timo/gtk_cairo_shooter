@@ -158,7 +158,7 @@ $app.g_timeout(1000 / 50).act(
             }
         }
 
-        for @bullets, @enemies {
+        for @bullets {
             $_.pos += $dt * $_.vel;
         }
         @bullets .= grep(
@@ -169,19 +169,20 @@ $app.g_timeout(1000 / 50).act(
         });
 
         for @enemies {
-            $_.pos += $dt * $_.vel;
-
             if $_.pos.re < 20 && $_.vel.re < 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
             if $_.pos.re > W - 20 && $_.vel.re > 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
-            if !defined $_.lifetime && $_.vel.im < 128 {
+            if !defined $_.lifetime && $_.vel.im < 182 {
                 $_.vel += ($dt * 100)\i;
                 my $polarvel = $_.vel.polar;
-                $_.vel = unpolar($polarvel[0] min 128, $polarvel[1]);
+                $_.vel = unpolar($polarvel[0] min 182, $polarvel[1]);
             }
+
+            $_.pos += $dt * $_.vel;
+
             if $_.lifetime {
                 $_.lifetime -= $dt;
                 $_.vel *= 0.8;
@@ -208,10 +209,8 @@ $app.g_timeout(1000 / 50).act(
                                 $explosion_background = 0.9 + 0.1.rand;
                             } elsif $_.HP > 0 {
                                 $_.HP--;
-                                $_.vel = $posdiff * 3;
-                                $_.vel -= 100i if $_.vel.im >= -50;
-                            } elsif $_.HP >= 0b11 {
-                                $_.HP--;
+                                my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
+                                $_.vel += $bumpdiff * ($_.HP > 2 ?? 75 !! 200) - 96i;
                             }
                             $b.pos -= 1000i;
                             last;
@@ -230,7 +229,7 @@ $app.g_timeout(1000 / 50).act(
         if 100.rand < ENEMY_PROB && @enemies < 100 {
             @enemies.push: Enemy.new:
                 :pos((W - 24).rand + 12 - 15i),
-                :vel((100.rand - 50) + 128i),
+                :vel((100.rand - 50) + 182i),
                 :HP(3);
         }
 
@@ -335,13 +334,13 @@ sub enemyship($ctx, $ship) {
                 $ctx.line_to(0, -(1 / $_) * 50) :relative;
                 $ctx.stroke();
             }
-            if $ship.HP < 3 {
+            if $ship.HP < 2 {
                 $ctx.push_group();
                 $ctx.rgb(1, 1, 1);
                 $ctx.rectangle(-20, -20, 40, 40);
                 $ctx.fill();
                 $ctx.rgb(0, 0, 0);
-                for ^(1 max (3 - $ship.HP)) {
+                for ^(1 max (2 - $ship.HP)) {
                     my $dir = (($ship.id + $_ * 1311) % 98) / 49 * π;
                     my $w = 0.3 + ($ship.id % 53) / 97;
                     my $a = unpolar(30, $dir - $w);
