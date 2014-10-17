@@ -152,11 +152,12 @@ $app.g_timeout(1000 / 50).act(
         for @bullets, @enemies {
             $_.pos += $dt * $_.vel;
         }
-        while @bullets
-            and (@bullets[0].pos.im < 0 or @bullets[0].pos.im > 800
-                or @bullets[0].pos.re < 0 or @bullets[0].pos.re > 1024) {
-            @bullets.shift
-        }
+        @bullets .= grep(
+            -> $b {
+                my $p = $b.pos;
+                0 < $b.pos.re < 1050
+                and 0 < $b.pos.im < 800
+        });
 
         for @enemies {
             $_.pos += $dt * $_.vel;
