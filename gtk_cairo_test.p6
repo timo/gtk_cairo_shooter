@@ -198,7 +198,7 @@ $app.g_timeout(1000 / 50).act(
                                 $_.lifetime = 2e0;
                                 $_.vel += $b.vel / 4;
                                 $_.vel *= 4;
-                                if 100.rand < REFRACT_PROB {
+                                if 100.rand < REFRACT_PROB && @bullets < 50 {
                                     for ^4 {
                                         @bullets.push:
                                             Object.new: :pos($b.pos), :vel(unpolar(768, (2 * π).rand));
@@ -231,7 +231,7 @@ $app.g_timeout(1000 / 50).act(
         }
         @enemies .= grep({ $_.pos.im < H + 30 && (!$_.lifetime || $_.lifetime > 0) });
 
-        if 100.rand < ENEMY_PROB {
+        if 100.rand < ENEMY_PROB && @enemies < 100 {
             @enemies.push: Enemy.new:
                 :pos((W - 24).rand + 12 - 15i),
                 :vel((100.rand - 50) + 128i),
