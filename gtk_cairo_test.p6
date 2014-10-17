@@ -125,12 +125,13 @@ my @kills;
 my $explosion_background = 0;
 
 my $go_t;
+my $framestart;
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
-
+        $framestart = nqp::time_n();
         $explosion_background -= $dt if $explosion_background > 0;
 
-        if $player.lifetime {
+        if ($player.lifetime // 0) > 0 {
             $player.lifetime -= $dt;
             if $player.lifetime < 0 {
                 if $game_draw_handler.connected {
@@ -200,7 +201,7 @@ $app.g_timeout(1000 / 50).act(
                                 if 100.rand < REFRACT_PROB {
                                     for ^4 {
                                         @bullets.push:
-                                            Object.new: :pos($b.pos), :vel(unpolar(768, (2 * pi).rand));
+                                            Object.new: :pos($b.pos), :vel(unpolar(768, (2 * π).rand));
                                     }
                                 }
                                 @kills.push($_);
@@ -261,9 +262,9 @@ sub playership($ctx, $ship) {
         $ctx.line_width = 1 / $rad;
         $ctx.move_to(0, 1);
         for ^10 {
-            my $pic = ($_ * pi * 2) / 10;
+            my $pic = ($_ * π * 2) / 10;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
-            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+            $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
         $ctx.line_to(0, 1);
         $ctx.operator = OPERATOR_XOR;
@@ -281,9 +282,9 @@ sub playership($ctx, $ship) {
         $ctx.rotate($ship.lifetime * 0.1);
         $ctx.move_to(0, 1);
         for ^10 {
-            my $pic = ($_ * pi * 2) / 10;
+            my $pic = ($_ * π * 2) / 10;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
-            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+            $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
         $ctx.line_to(0, 1);
         $ctx.stroke();
@@ -314,9 +315,9 @@ sub enemyship($ctx, $ship) {
         $ctx.line_width = 1 / $rad;
         $ctx.move_to(0, 1);
         for ^10 {
-            my $pic = ($_ * pi * 2) / 10;
+            my $pic = ($_ * π * 2) / 10;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
-            $ctx.line_to(sin($pic + pi * 2 / 20) * 0.3, cos($pic + pi * 2 / 20) * 0.3);
+            $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
         $ctx.line_to(0, 1);
         $ctx.fill() :preserve;
@@ -325,7 +326,7 @@ sub enemyship($ctx, $ship) {
     } else {
         my $polarvel = $ship.vel.polar;
 
-        $ctx.rotate($polarvel[1] - 0.5 * pi);
+        $ctx.rotate($polarvel[1] - 0.5 * π);
 
         if ($player.lifetime // 2) > 0 {
             $ctx.line_cap = LINE_CAP_ROUND;
@@ -385,22 +386,23 @@ sub game_over_screen($widget, $ctx) {
         next unless defined $kill;
         my $maybe = (nqp::time_n() - $go_t) * 3 - ($kill.id % ($edgelength * 3)) / 3;
         #$maybe min= 1;
-        if 1 >= $maybe >= 0 {
+        if $maybe >= 0 {
             $ctx.save();
             $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
             $ctx.scale($maybe, $maybe);
             $ctx.&enemyship($kill);
             $ctx.restore();
-        } elsif $maybe > 1 {
-            $screen_img.record(
-                -> $ctx {
-                    $ctx.scale(SCALE, SCALE);
-                    $ctx.scale($factor, $factor);
-                    $ctx.translate(50, 50);
-                    $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
-                    $ctx.&enemyship($kill);
-                });
-            @kills[$_] = Any;
+            if $maybe > 1 {
+                $screen_img.record(
+                    -> $ctx {
+                        $ctx.scale(SCALE, SCALE);
+                        $ctx.scale($factor, $factor);
+                        $ctx.translate(50, 50);
+                        $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
+                        $ctx.&enemyship($kill);
+                    });
+                @kills[$_] = Any;
+            }
         }
     }
 
@@ -422,7 +424,6 @@ sub game_over_screen($widget, $ctx) {
 
 $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
-        my $start = nqp::time_n();
 
         $ctx.save();
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
@@ -489,7 +490,7 @@ $game_draw_handler = $da.add_draw_handler(
         }
         $ctx.fill();
 
-        @frametimes.push: nqp::time_n() - $start;
+        @frametimes.push: nqp::time_n() - $framestart;
 
         CATCH {
             say $_
