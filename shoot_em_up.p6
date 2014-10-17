@@ -402,10 +402,9 @@ sub enemyship($ctx, $ship) {
 sub shieldbounce($ctx, $bounce) {
     my $polarvel = $bounce.vel.polar;
 
-    $ctx.rotate($polarvel[1] + 0.5 * π);
     $ctx.line_width = 5;
     $ctx.rgba(0, 0, 0.75, 4 * $bounce.lifetime);
-    $ctx.arc(0, 0, 30, 0, 2 * π);
+    $ctx.arc(0, 0, 30 / ($bounce.lifetime * 2 + 0.75) , 0, 2 * π);
     $ctx.stroke() :preserve;
     $ctx.rgba(0, 0, 0.75, $bounce.lifetime);
     $ctx.fill();
