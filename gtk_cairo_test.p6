@@ -206,12 +206,8 @@ $app.g_timeout(1000 / 50).act(
                                 }
                                 @kills.push($_);
                                 $explosion_background = 0.9 + 0.1.rand;
-                            } elsif $_.HP > 0 && $_.HP <= 0b11 {
-                                if $posdiff.re < 0 {
-                                    $_.HP +&= +^ 0b01;
-                                } else {
-                                    $_.HP +&= +^ 0b10;
-                                }
+                            } elsif $_.HP > 0 {
+                                $_.HP--;
                                 $_.vel = $posdiff * 3;
                                 $_.vel -= 100i if $_.vel.im >= -50;
                             } elsif $_.HP >= 0b11 {
@@ -344,16 +340,12 @@ sub enemyship($ctx, $ship) {
         $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
         $ctx.move_to(5, -15);
         $ctx.line_to(-5, -15);
-        if $ship.HP >= 0b11 || $ship.HP +& 0b10 {
-            $ctx.curve_to(-30, -15, -15, 15, -5, 15);
-        }
+        $ctx.curve_to(-30, -15, -15, 15, -5, 15);
         $ctx.line_to(-3, -5);
         $ctx.line_to(0, 5);
         $ctx.line_to(3, -5);
-        if $ship.HP >= 3 || $ship.HP +& 0b01 {
-            $ctx.line_to(5, 15);
-            $ctx.curve_to(15, 15, 30, -15, 5, -15);
-        }
+        $ctx.line_to(5, 15);
+        $ctx.curve_to(15, 15, 30, -15, 5, -15);
         $ctx.line_to(5, -15);
 
         $ctx.line_to(0, -5) :relative;
