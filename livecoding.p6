@@ -81,15 +81,15 @@ sub MAIN($filename? is copy) {
         $codeview.text = $filename.IO.slurp;
     } else  {
         $codeview.text = q:to/.../;
-            sub frame($cairo, $t, $dt) {
-                $cairo.scale(2, 2);
-                $cairo.rgb(0, 0, 0);
-                $cairo.rectangle(0, 0, 150, 150);
-                $cairo.fill();
-                $cairo.rgb(1, 0.75, 0.1);
-                $cairo.move_to(sin($t) * 50 + 75, 50);
-                $cairo.line_to(0, cos($t) * 50) :relative;
-                $cairo.stroke();
+            sub frame($_, $t, $dt) {
+                .scale(2, 2);
+                .rgb(0, 0, 0);
+                .rectangle(0, 0, 150, 150);
+                .fill();
+                .rgb(1, 0.75, 0.1);
+                .move_to(sin($t) * 50 + 75, 50);
+                .line_to(0, cos($t) * 50) :relative;
+                .stroke();
             }
             ...
     }
