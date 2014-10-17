@@ -31,21 +31,26 @@ constant ENEMY_PROB = 5;
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
+# Real window size
+constant SCREEN_W = 1680;
+constant SCREEN_H = 1050;
+
+# normalized, "fake" window size
 constant W = 800;
 constant H = 600;
 
-constant SCALE = (1200 / 800) min (900 / 600);
+constant SCALE = (SCREEN_W / W) min (SCREEN_H / H);
+
+constant LETTERBOX_LEFT = (SCREEN_W - W * SCALE) / 2;
+constant LETTERBOX_TOP  = (SCREEN_H - H * SCALE) / 2;
 
 say W * SCALE;
 say H * SCALE;
 
 my $game_draw_handler;
 
-$app.size_request(W * SCALE, H * SCALE);
-$da.size_request(W * SCALE, H * SCALE);
-
-my Int @star_x = (0..W).roll(STARCOUNT);
-my Int @star_y = (0..H).roll(STARCOUNT);
+$app.size_request(SCREEN_W, SCREEN_H);
+$da.size_request(SCREEN_W, SCREEN_H);
 
 my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
@@ -226,7 +231,7 @@ $app.g_timeout(1000 / 50).act(
 
         if 100.rand < ENEMY_PROB {
             @enemies.push: Enemy.new:
-                :pos(1000.rand + 12 - 15i),
+                :pos((W - 24).rand + 12 - 15i),
                 :vel((100.rand - 50) + 128i),
                 :HP(3);
         }
@@ -366,6 +371,8 @@ sub game_over_screen($widget, $ctx) {
             $ctx.rgb(0, 0, 0);
             $ctx.fill();
         }, W * SCALE, H * SCALE);
+    $ctx.save();
+    $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
     $ctx.set_source_surface($screen_img);
     $ctx.paint();
     $ctx.scale(SCALE, SCALE);
@@ -397,6 +404,17 @@ sub game_over_screen($widget, $ctx) {
         }
     }
 
+    $ctx.restore();
+    $ctx.rgb(0, 0, 0);
+    if (LETTERBOX_TOP) {
+        $ctx.rectangle(0, 0, SCREEN_W, LETTERBOX_TOP);
+        $ctx.rectangle(0, SCREEN_H - LETTERBOX_TOP, SCREEN_W, LETTERBOX_TOP);
+    } elsif (LETTERBOX_LEFT) {
+        $ctx.rectangle(0, 0, LETTERBOX_LEFT, SCREEN_H);
+        $ctx.rectangle(SCREEN_W - LETTERBOX_LEFT, 0, LETTERBOX_LEFT, SCREEN_H);
+    }
+    $ctx.fill();
+
     CATCH {
         say $_
     }
@@ -406,6 +424,8 @@ $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
         my $start = nqp::time_n();
 
+        $ctx.save();
+        $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
         $ctx.scale(SCALE, SCALE);
 
         $ctx.rgba(0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 0.2 * $explosion_background ** 4, 1);
@@ -457,6 +477,17 @@ $game_draw_handler = $da.add_draw_handler(
         $ctx.translate($player.pos.re, $player.pos.im);
         $ctx.&playership($player);
         $ctx.restore();
+
+        $ctx.restore();
+        $ctx.rgb(0, 0, 0);
+        if (LETTERBOX_TOP) {
+            $ctx.rectangle(0, 0, SCREEN_W, LETTERBOX_TOP);
+            $ctx.rectangle(0, SCREEN_H - LETTERBOX_TOP, SCREEN_W, LETTERBOX_TOP);
+        } elsif (LETTERBOX_LEFT) {
+            $ctx.rectangle(0, 0, LETTERBOX_LEFT, SCREEN_H);
+            $ctx.rectangle(SCREEN_W - LETTERBOX_LEFT, 0, LETTERBOX_LEFT, SCREEN_H);
+        }
+        $ctx.fill();
 
         @frametimes.push: nqp::time_n() - $start;
 
