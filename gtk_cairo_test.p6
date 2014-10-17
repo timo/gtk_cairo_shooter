@@ -31,10 +31,13 @@ constant ENEMY_PROB = 5;
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
-constant W = 1024;
-constant H = 786;
+constant W = 800;
+constant H = 600;
 
-constant SCALE = (1920 / 1024) min (1080 / 786);
+constant SCALE = (1200 / 800) min (900 / 600);
+
+say W * SCALE;
+say H * SCALE;
 
 my $game_draw_handler;
 
@@ -137,7 +140,7 @@ $app.g_timeout(1000 / 50).act(
             if %down_keys<K_LEFT> && $player.pos.re > 20 {
                 $player.pos -= 512 * $dt;
             }
-            if %down_keys<K_RIGHT> && $player.pos.re < 1004 {
+            if %down_keys<K_RIGHT> && $player.pos.re < W - 20 {
                 $player.pos += 512 * $dt;
             }
         }
@@ -155,8 +158,8 @@ $app.g_timeout(1000 / 50).act(
         @bullets .= grep(
             -> $b {
                 my $p = $b.pos;
-                0 < $b.pos.re < 1050
-                and 0 < $b.pos.im < 800
+                0 < $b.pos.re < W
+                and 0 < $b.pos.im < H
         });
 
         for @enemies {
@@ -165,7 +168,7 @@ $app.g_timeout(1000 / 50).act(
             if $_.pos.re < 20 && $_.vel.re < 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
-            if $_.pos.re > 1004 && $_.vel.re > 0 {
+            if $_.pos.re > W - 20 && $_.vel.re > 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
             if !defined $_.lifetime && $_.vel.im < 128 {
@@ -219,7 +222,7 @@ $app.g_timeout(1000 / 50).act(
                 }
             }
         }
-        @enemies .= grep({ $_.pos.im < 790 && (!$_.lifetime || $_.lifetime > 0) });
+        @enemies .= grep({ $_.pos.im < H + 30 && (!$_.lifetime || $_.lifetime > 0) });
 
         if 100.rand < ENEMY_PROB {
             @enemies.push: Enemy.new:
@@ -242,7 +245,7 @@ sub playership($ctx, $ship) {
         $ctx.save();
         $ctx.push_group();
 
-        $ctx.rectangle(-$ship.pos.re * 4, -$ship.pos.im * 4, 1024 * 4, 786 * 4);
+        $ctx.rectangle(-$ship.pos.re * 4, -$ship.pos.im * 4, W * 4, H * 4);
         $ctx.rgb(0, 0, 0);
         $ctx.fill();
 
@@ -319,13 +322,15 @@ sub enemyship($ctx, $ship) {
 
         $ctx.rotate($polarvel[1] - 0.5 * pi);
 
-        $ctx.line_cap = LINE_CAP_ROUND;
-        for ^4 {
-            $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
-            $ctx.line_width = $_ ** 2;
-            $ctx.move_to(0, -13);
-            $ctx.line_to(0, -(1 / $_) * 50) :relative;
-            $ctx.stroke();
+        if ($player.lifetime // 2) > 0 {
+            $ctx.line_cap = LINE_CAP_ROUND;
+            for ^4 {
+                $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
+                $ctx.line_width = $_ ** 2;
+                $ctx.move_to(0, -13);
+                $ctx.line_to(0, -(1 / $_) * 50) :relative;
+                $ctx.stroke();
+            }
         }
 
         $ctx.line_width = 1;
@@ -355,24 +360,46 @@ sub enemyship($ctx, $ship) {
 }
 
 sub game_over_screen($widget, $ctx) {
+    state $screen_img = Cairo::Image.record(
+        -> $ctx {
+            $ctx.rectangle(0, 0, W * SCALE, H * SCALE);
+            $ctx.rgb(0, 0, 0);
+            $ctx.fill();
+            $ctx.rgb(1, 0, 0);
+            $ctx.move_to(10, 10);
+            $ctx.line_to(10, 10) :relative;
+            $ctx.move_to(1200, 900);
+            $ctx.line_to(-50, -50) :relative;
+            $ctx.stroke();
+        }, W * SCALE, H * SCALE);
+    $ctx.set_source_surface($screen_img);
+    $ctx.paint();
     $ctx.scale(SCALE, SCALE);
-    $ctx.rgb(0, 0, 0);
-    $ctx.rectangle(0, 0, 1024, 786);
-    $ctx.fill();
 
-    my $edgelength = (@kills + 1).sqrt.ceiling;
-    $ctx.scale(700 / ($edgelength * 50), 700 / ($edgelength * 50));
+    state $edgelength = (@kills + 1).sqrt.ceiling;
+    $ctx.scale(my $factor = (H - 100) / ($edgelength * 50), $factor);
     $ctx.translate(50, 50);
     for ^@kills {
         my $kill = @kills[$_];
+        next unless defined $kill;
         my $maybe = (nqp::time_n() - $go_t) * 3 - ($kill.id % ($edgelength * 3)) / 3;
-        $maybe min= 1;
-        if $maybe >= 0 {
+        #$maybe min= 1;
+        if 1 >= $maybe >= 0 {
             $ctx.save();
             $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
             $ctx.scale($maybe, $maybe);
             $ctx.&enemyship($kill);
             $ctx.restore();
+        } elsif $maybe > 1 {
+            $screen_img.record(
+                -> $ctx {
+                    $ctx.scale(SCALE, SCALE);
+                    $ctx.scale($factor, $factor);
+                    $ctx.translate(50, 50);
+                    $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
+                    $ctx.&enemyship($kill);
+                });
+            @kills[$_] = Any;
         }
     }
 
