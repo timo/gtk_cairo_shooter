@@ -266,8 +266,8 @@ sub playership($ctx, $ship) {
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
         $ctx.move_to(0, 1);
-        for ^10 {
-            my $pic = ($_ * π * 2) / 10;
+        for ^5 {
+            my $pic = ($_ * π * 2) / 5;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
             $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
@@ -286,8 +286,8 @@ sub playership($ctx, $ship) {
         $ctx.line_width = 1 / $rad;
         $ctx.rotate($ship.lifetime * 0.1);
         $ctx.move_to(0, 1);
-        for ^10 {
-            my $pic = ($_ * π * 2) / 10;
+        for ^5 {
+            my $pic = ($_ * π * 2) / 5;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
             $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
@@ -319,8 +319,8 @@ sub enemyship($ctx, $ship) {
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
         $ctx.move_to(0, 1);
-        for ^10 {
-            my $pic = ($_ * π * 2) / 10;
+        for ^5 {
+            my $pic = ($_ * π * 2) / 5;
             $ctx.line_to(sin($pic) * 1, cos($pic) * 1);
             $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
