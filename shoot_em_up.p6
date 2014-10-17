@@ -119,8 +119,9 @@ $app.signal_supply("key-release-event").act(
 
 my @bullets;
 my @enemies;
-my $nextreload = 0;
+my @shieldbounces;
 my @kills;
+my $nextreload = 0;
 
 my $explosion_background = 0;
 
@@ -158,8 +159,9 @@ $app.g_timeout(1000 / 50).act(
             }
         }
 
-        for @bullets {
+        for @bullets, @shieldbounces {
             $_.pos += $dt * $_.vel;
+            $_.lifetime -= $dt if defined $_.lifetime;
         }
         @bullets .= grep(
             -> $b {
@@ -210,7 +212,13 @@ $app.g_timeout(1000 / 50).act(
                             } elsif $_.HP > 0 {
                                 $_.HP--;
                                 my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
-                                $_.vel += $bumpdiff * ($_.HP > 2 ?? 75 !! 200) - 96i;
+                                $_.vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
+                                if $_.HP >= 2 {
+                                    @shieldbounces.push:
+                                        Object.new: :pos($_.pos),
+                                                    :vel($_.vel),
+                                                    :lifetime(0.25e0);
+                                }
                             }
                             $b.pos -= 1000i;
                             last;
@@ -225,6 +233,7 @@ $app.g_timeout(1000 / 50).act(
             }
         }
         @enemies .= grep({ $_.pos.im < H + 30 && (!$_.lifetime || $_.lifetime > 0) });
+        @shieldbounces.shift while @shieldbounces and @shieldbounces[0].lifetime <= 0;
 
         if 100.rand < ENEMY_PROB && @enemies < 100 {
             @enemies.push: Enemy.new:
@@ -390,6 +399,18 @@ sub enemyship($ctx, $ship) {
     }
 }
 
+sub shieldbounce($ctx, $bounce) {
+    my $polarvel = $bounce.vel.polar;
+
+    $ctx.rotate($polarvel[1] + 0.5 * π);
+    $ctx.line_width = 5;
+    $ctx.rgba(0, 0, 0.75, 4 * $bounce.lifetime);
+    $ctx.arc(0, 0, 30, 0, 2 * π);
+    $ctx.stroke() :preserve;
+    $ctx.rgba(0, 0, 0.75, $bounce.lifetime);
+    $ctx.fill();
+}
+
 sub game_over_screen($widget, $ctx) {
     state $screen_img = Cairo::Image.record(
         -> $ctx {
@@ -499,6 +520,12 @@ $game_draw_handler = $da.add_draw_handler(
             $ctx.save();
             $ctx.translate($_.pos.re, $_.pos.im);
             $ctx.&enemyship($_);
+            $ctx.restore();
+        }
+        for @shieldbounces {
+            $ctx.save();
+            $ctx.translate($_.pos.re, $_.pos.im);
+            $ctx.&shieldbounce($_);
             $ctx.restore();
         }
 
