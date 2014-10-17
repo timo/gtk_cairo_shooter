@@ -32,8 +32,8 @@ constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
 # Real window size
-constant SCREEN_W = 1680;
-constant SCREEN_H = 1050;
+constant SCREEN_W = 1200;
+constant SCREEN_H = 900;
 
 # normalized, "fake" window size
 constant W = 800;
