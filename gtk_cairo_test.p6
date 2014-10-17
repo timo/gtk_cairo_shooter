@@ -365,12 +365,6 @@ sub game_over_screen($widget, $ctx) {
             $ctx.rectangle(0, 0, W * SCALE, H * SCALE);
             $ctx.rgb(0, 0, 0);
             $ctx.fill();
-            $ctx.rgb(1, 0, 0);
-            $ctx.move_to(10, 10);
-            $ctx.line_to(10, 10) :relative;
-            $ctx.move_to(1200, 900);
-            $ctx.line_to(-50, -50) :relative;
-            $ctx.stroke();
         }, W * SCALE, H * SCALE);
     $ctx.set_source_surface($screen_img);
     $ctx.paint();
