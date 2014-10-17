@@ -242,7 +242,7 @@ sub playership($ctx, $ship) {
         $ctx.save();
         $ctx.push_group();
 
-        $ctx.rectangle(-$ship.pos.im * 4, -$ship.pos.re * 4, 1024 * 4, 786 * 4);
+        $ctx.rectangle(-$ship.pos.re * 4, -$ship.pos.im * 4, 1024 * 4, 786 * 4);
         $ctx.rgb(0, 0, 0);
         $ctx.fill();
 
