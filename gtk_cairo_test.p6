@@ -322,6 +322,7 @@ sub enemyship($ctx, $ship) {
         $ctx.stroke();
     } else {
         my $polarvel = $ship.vel.polar;
+        my $damagemask;
 
         $ctx.rotate($polarvel[1] - 0.5 * π);
 
@@ -334,6 +335,32 @@ sub enemyship($ctx, $ship) {
                 $ctx.line_to(0, -(1 / $_) * 50) :relative;
                 $ctx.stroke();
             }
+            if $ship.HP < 3 {
+                $ctx.push_group();
+                $ctx.rgb(1, 1, 1);
+                $ctx.rectangle(-20, -20, 40, 40);
+                $ctx.fill();
+                $ctx.rgb(0, 0, 0);
+                for ^(1 max (3 - $ship.HP)) {
+                    my $dir = (($ship.id + $_ * 1311) % 98) / 49 * π;
+                    my $w = 0.3 + ($ship.id % 53) / 97;
+                    my $a = unpolar(30, $dir - $w);
+                    my $b = unpolar(30, $dir + $w);
+                    $ctx.move_to($a.re * 0.1, $a.im * 0.1);
+                    $ctx.line_to($a.re, $a.im);
+                    $ctx.line_to($b.re, $b.im);
+                    $ctx.line_to($b.re * 0.1, $b.im * 0.1);
+                    $ctx.close_path();
+                }
+                $ctx.operator = OPERATOR_XOR;
+                $ctx.fill();
+                $ctx.operator = OPERATOR_OVER;
+                $damagemask = $ctx.pop_group();
+            }
+        }
+
+        if $damagemask {
+            $ctx.push_group();
         }
 
         $ctx.line_width = 1;
@@ -355,6 +382,12 @@ sub enemyship($ctx, $ship) {
         $ctx.fill() :preserve;
         $ctx.rgb(1, 1, 1);
         $ctx.stroke();
+
+        if $damagemask {
+            $ctx.pop_group_to_source();
+            $ctx.mask($damagemask);
+            $damagemask.destroy();
+        }
     }
 }
 
