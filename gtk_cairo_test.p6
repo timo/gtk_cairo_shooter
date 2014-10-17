@@ -179,6 +179,9 @@ $app.g_timeout(1000 / 50).act(
             } else {
                 if !defined $player.lifetime {
                     for @bullets -> $b {
+                        next unless -20 < $b.pos.re - $_.pos.re < 20;
+                        next unless -20 < $b.pos.im - $_.pos.im < 20;
+
                         my $posdiff   = ($_.pos - $b.pos);
                         my $polardiff = $posdiff.polar;
                         if $polardiff[0] < 30 {
