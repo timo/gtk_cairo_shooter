@@ -63,7 +63,7 @@ my @star_surfaces = do for ^4 -> $chunk {
                 my $star_y = SCREEN_H.rand.Int;
                 $ctx.move_to($star_x, $star_y);
                 $ctx.line_to(0, 0, :relative);
-                $ctx.move_to($star_x, $star_y + H);
+                $ctx.move_to($star_x, $star_y + SCREEN_H);
                 $ctx.line_to(0, 0, :relative);
             }
             $ctx.stroke;
@@ -491,10 +491,10 @@ $game_draw_handler = $da.add_draw_handler(
         my $ft = nqp::time_n();
 
         #my @yoffs  = do (nqp::time_n() * $_) % H - H for (100, 80, 50, 15);
-        my @yoffs  = (nqp::time_n() * 100) % H - H,
-                     (nqp::time_n() *  80) % H - H,
-                     (nqp::time_n() *  50) % H - H,
-                     (nqp::time_n() *  15) % H - H;
+        my @yoffs  = (nqp::time_n() * 100) % SCREEN_H - SCREEN_H,
+                     (nqp::time_n() *  80) % SCREEN_H - SCREEN_H,
+                     (nqp::time_n() *  50) % SCREEN_H - SCREEN_H,
+                     (nqp::time_n() *  15) % SCREEN_H - SCREEN_H;
 
         $ctx.save();
         $ctx.scale(1 / SCALE, 1 / SCALE);
