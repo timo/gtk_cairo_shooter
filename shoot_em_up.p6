@@ -342,9 +342,9 @@ sub enemyship($ctx, $ship) {
             $ctx.line_cap = LINE_CAP_ROUND;
             for ^4 {
                 $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
-                $ctx.line_width = $_ ** 2;
+                $ctx.line_width = $_ * $_;
                 $ctx.move_to(0, -13);
-                $ctx.line_to(0, -(1 / $_) * 50) :relative;
+                $ctx.line_to(0, -13 -(1 / $_) * 50);
                 $ctx.stroke();
             }
             if $ship.HP < 2 {
@@ -505,9 +505,6 @@ $game_draw_handler = $da.add_draw_handler(
             $ctx.line_to($_.vel.re * 0.05, $_.vel.im * 0.05) :relative;
         }
         $ctx.stroke();
-        $ctx.restore();
-
-        $ctx.save();
         $ctx.rgb(1, 1, 1);
         $ctx.line_width = 3;
 
@@ -541,11 +538,12 @@ $game_draw_handler = $da.add_draw_handler(
         if (LETTERBOX_TOP) {
             $ctx.rectangle(0, 0, SCREEN_W, LETTERBOX_TOP);
             $ctx.rectangle(0, SCREEN_H - LETTERBOX_TOP, SCREEN_W, LETTERBOX_TOP);
+            $ctx.fill();
         } elsif (LETTERBOX_LEFT) {
             $ctx.rectangle(0, 0, LETTERBOX_LEFT, SCREEN_H);
             $ctx.rectangle(SCREEN_W - LETTERBOX_LEFT, 0, LETTERBOX_LEFT, SCREEN_H);
+            $ctx.fill();
         }
-        $ctx.fill();
 
         @frametimes.push: nqp::time_n() - $framestart;
 
