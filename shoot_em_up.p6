@@ -59,17 +59,17 @@ my @star_surfaces = do for ^4 -> $chunk {
             $ctx.rgba(1, 1, 1, 1);
 
             for ^CHUNKSIZE {
-                my $star_x = (0..W).pick;
-                my $star_y = (0..H).pick;
+                my $star_x = W.rand.Int;
+                my $star_y = H.rand.Int;
                 $ctx.move_to($star_x, $star_y);
                 $ctx.line_to(0, 0, :relative);
                 $ctx.move_to($star_x, $star_y + H);
                 $ctx.line_to(0, 0, :relative);
-                $ctx.stroke;
             }
+            $ctx.stroke;
 
             $tgt;
-        }, W, 2 * H, FORMAT_A8);
+        }, SCREEN_W, 2 * SCREEN_H, FORMAT_A8);
     }
 
 my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i) );
@@ -487,13 +487,12 @@ $game_draw_handler = $da.add_draw_handler(
                      (nqp::time_n() *  50) % H - H,
                      (nqp::time_n() *  15) % H - H;
 
+        $ctx.save();
         for ^4 {
-            $ctx.save();
             $ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
             $ctx.mask(@star_surfaces[$_], 0, @yoffs[$_]);
-            $ctx.fill();
-            $ctx.restore();
         }
+        $ctx.restore();
 
         $ctx.save();
         $ctx.rgba(0, 0, 1, 0.75);
