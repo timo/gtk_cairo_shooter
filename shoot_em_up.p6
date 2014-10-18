@@ -256,6 +256,7 @@ $app.g_timeout(1000 / 50).act(
     });
 
 my @frametimes;
+my @gctimes;
 
 sub playership($ctx, $ship) {
     if $ship.lifetime {
@@ -478,6 +479,7 @@ sub game_over_screen($widget, $ctx) {
 
 $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
+        $ctx.antialias = ANTIALIAS_FAST;
         $ctx.save();
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
         $ctx.scale(SCALE, SCALE);
@@ -514,21 +516,25 @@ $game_draw_handler = $da.add_draw_handler(
         $ctx.line_width = 3;
 
         for @bullets {
+            my $vel := $_.vel;
             $ctx.move_to($_.pos.re, $_.pos.im);
-            $ctx.line_to($_.vel.re * 0.03, $_.vel.im * 0.03) :relative;
+            $ctx.move_to($vel.re * 0.01, $vel.im * 0.01) :relative;
+            $ctx.line_to($vel.re * 0.03, $vel.im * 0.03) :relative;
         }
         $ctx.stroke();
         $ctx.restore();
 
         for @enemies {
+            my $pos := $_.pos;
             $ctx.save();
-            $ctx.translate($_.pos.re, $_.pos.im);
+            $ctx.translate($pos.re, $pos.im);
             $ctx.&enemyship($_);
             $ctx.restore();
         }
         for @shieldbounces {
+            my $pos := $_.pos;
             $ctx.save();
-            $ctx.translate($_.pos.re, $_.pos.im);
+            $ctx.translate($pos.re, $pos.im);
             $ctx.&shieldbounce($_);
             $ctx.restore();
         }
@@ -550,7 +556,35 @@ $game_draw_handler = $da.add_draw_handler(
             $ctx.fill();
         }
 
+        #$ctx.line_width = 1;
+        $ctx.rgb(1, 0, 0);
+        $ctx.move_to(10, 10);
+        $ctx.line_to(10 + @enemies * 5, 10);
+        $ctx.stroke;
+        $ctx.rgb(0, 1, 0);
+        $ctx.move_to(10, 20);
+        $ctx.line_to(10 + @shieldbounces * 5, 20);
+        $ctx.stroke;
+        $ctx.rgb(0, 0, 1);
+        $ctx.move_to(10, 30);
+        $ctx.line_to(10 + @bullets * 5, 30);
+        $ctx.stroke;
+
+        #if @frametimes > 50 {
+            #$ctx.rgb(1, 1, 1);
+            #for 1..50 {
+                #my int $pos = @frametimes - $_;
+                #$ctx.move_to(10, 40 + $_ * 3);
+                #$ctx.line_to(10 + 1 / (@frametimes[$pos]), 40 + $_ * 3);
+            #}
+            #$ctx.stroke;
+        #}
+
         @frametimes.push: nqp::time_n() - $framestart;
+
+        nqp::force_gc() if 2.rand.Int;
+
+        @gctimes.push: nqp::time_n() - $framestart;
 
         CATCH {
             say $_
@@ -560,14 +594,18 @@ $game_draw_handler = $da.add_draw_handler(
 $app.run();
 
 say "analysis of frame times incoming";
-for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes -> @times is copy {
+for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes, $(@gctimes Z- @frametimes) -> @times is copy {
     say "----";
-    say <<"calculation times" "rendering times" "complete times">>[(state $)++];
+    say <<"calculation times" "rendering times" "complete times" "GC times">>[(state $)++];
     @times .= sort;
 
     my @timings = (@times[* div 50], @times[* div 4], @times[* div 2], @times[* * 3 div 4], @times[* - * div 100]);
 
     say "frames per second:";
-    say (1 X/ @timings).fmt("%.3f");
+    say (1 X/ @timings).fmt("%3.4f");
+    say "timings:";
+    say (     @timings).fmt("%3.4f");
     say "";
 }
+
+"frame_rates.txt".IO.spurt: (1 X/ @frametimes).fmt("%3.2f\n")
