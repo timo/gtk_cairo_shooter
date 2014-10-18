@@ -145,17 +145,17 @@ $app.g_timeout(1000 / 50).act(
             }
         } else {
             if %down_keys<K_LEFT> && $player.pos.re > 20 {
-                $player.pos -= 512 * $dt;
+                $player.pos -= 400 * $dt;
             }
             if %down_keys<K_RIGHT> && $player.pos.re < W - 20 {
-                $player.pos += 512 * $dt;
+                $player.pos += 400 * $dt;
             }
         }
 
         if %down_keys<K_SPACE> {
             if $t > $nextreload && !defined $player.lifetime {
                 @bullets.push(Object.new(:pos($player.pos), :vel(0 - 768i)));
-                $nextreload = $t + 0.15;
+                $nextreload = $t + 0.2;
             }
         }
 
@@ -171,10 +171,10 @@ $app.g_timeout(1000 / 50).act(
         });
 
         for @enemies {
-            if $_.pos.re < 20 && $_.vel.re < 0 {
+            if $_.pos.re < 15 && $_.vel.re < 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
-            if $_.pos.re > W - 20 && $_.vel.re > 0 {
+            if $_.pos.re > W - 15 && $_.vel.re > 0 {
                 $_.vel = -$_.vel.re + $_.vel.im\i
             }
             if !defined $_.lifetime && $_.vel.im < 182 {
@@ -196,7 +196,7 @@ $app.g_timeout(1000 / 50).act(
 
                         my $posdiff   = ($_.pos - $b.pos);
                         my $polardiff = $posdiff.polar;
-                        if $polardiff[0] < 30 {
+                        if $polardiff[0] < 35 {
                             if $_.HP == 0 {
                                 $_.lifetime = 2e0;
                                 $_.vel += $b.vel / 4;
@@ -210,6 +210,7 @@ $app.g_timeout(1000 / 50).act(
                                 @kills.push($_);
                                 $explosion_background = 0.9 + 0.1.rand;
                             } elsif $_.HP > 0 {
+                                next if $_.HP <= 2 && $polardiff >= 25;
                                 $_.HP--;
                                 my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
                                 $_.vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
@@ -294,7 +295,7 @@ sub playership($ctx, $ship) {
         $ctx.line_to(0, 1);
         $ctx.stroke();
     } else {
-        $ctx.scale(0.3, 0.3);
+        $ctx.scale(0.2, 0.2);
         $ctx.line_width = 8;
         $ctx.rgb(1, 1, 1);
 
@@ -314,7 +315,7 @@ sub playership($ctx, $ship) {
 sub enemyship($ctx, $ship) {
     if $ship.lifetime {
         $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
-        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.01);
+        $ctx.rotate($ship.lifetime * ($ship.id % 128 - 64) * 0.1);
         my $rad = ($ship.lifetime ** 4 + 0.001) * 5;
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
@@ -333,6 +334,7 @@ sub enemyship($ctx, $ship) {
         my $damagemask;
 
         $ctx.rotate($polarvel[1] - 0.5 * π);
+        $ctx.scale(0.8, 0.8);
 
         if ($player.lifetime // 2) > 0 {
             $ctx.line_cap = LINE_CAP_ROUND;
