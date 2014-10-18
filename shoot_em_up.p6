@@ -28,6 +28,8 @@ $app.set_content(
 constant REFRACT_PROB = 30;
 constant ENEMY_PROB = 5;
 
+constant PLAYER_RELOAD_TIME = 0.1;
+
 constant STARCOUNT = 1000;
 constant CHUNKSIZE = STARCOUNT div 4;
 
@@ -47,7 +49,7 @@ constant LETTERBOX_TOP  = (SCREEN_H - H * SCALE) / 2;
 my $game_draw_handler;
 
 $app.size_request(SCREEN_W, SCREEN_H);
-$da.size_request(SCREEN_W, SCREEN_H);
+ $da.size_request(SCREEN_W, SCREEN_H);
 
 my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
@@ -69,7 +71,7 @@ my @star_surfaces = do for ^4 -> $chunk {
         }, SCREEN_W, 2 * SCREEN_H, FORMAT_ARGB32);
     }
 
-my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i) );
+my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i), :vel(10i) );
 
 $app.events.set(KEY_PRESS_MASK, KEY_RELEASE_MASK);
 
@@ -119,6 +121,7 @@ my @enemies;
 my @shieldbounces;
 my @kills;
 my $nextreload = 0;
+my $shootside = -1;
 
 my $explosion_background = 0;
 
@@ -137,7 +140,7 @@ $app.g_timeout(1000 / 50).act(
                     $game_draw_handler.disconnect();
                     $da.add_draw_handler(&game_over_screen);
                     @kills>>.lifetime = Num;
-                    .HP = 0b11 for @kills;
+                    .HP = 0 for @kills;
                     $go_t = nqp::time_n();
                 }
             }
@@ -148,24 +151,38 @@ $app.g_timeout(1000 / 50).act(
             if %down_keys<K_RIGHT> && $player.pos.re < W - 20 {
                 $player.pos += 400 * $dt;
             }
+            if %down_keys<K_UP> && $player.pos.im > 20 {
+                $player.pos -= 400i * $dt;
+            }
+            if %down_keys<K_DOWN> && $player.pos.im < H - 20 {
+                $player.pos += 400i * $dt;
+            }
         }
 
         if %down_keys<K_SPACE> {
             if $t > $nextreload && !defined $player.lifetime {
-                @bullets.push(Object.new(:pos($player.pos), :vel(0 - 768i)));
-                $nextreload = $t + 0.2;
+                @bullets.push: Object.new:
+                        :pos($player.pos + ($shootside *= -1) * 15 + 15i),
+                        :vel(($shootside * -1) * 25 - 768i),
+                        :lifetime(4e0);
+                $nextreload = $t + PLAYER_RELOAD_TIME;
             }
         }
 
-        for @bullets, @shieldbounces {
+        for @bullets {
+            $_.pos += $dt * $_.vel;
+            $_.lifetime -= $dt;
+        }
+        for  @shieldbounces {
             $_.pos += $dt * $_.vel;
             $_.lifetime -= $dt if defined $_.lifetime;
         }
         @bullets .= grep(
             -> $b {
                 my $p = $b.pos;
-                0 < $p.re < W
-                and 0 < $p.im < H
+                $b.lifetime > 0
+                and -50 < $p.re < W + 50
+                and -50 < $p.im < H + 50
         });
 
         for @enemies {
@@ -195,25 +212,28 @@ $app.g_timeout(1000 / 50).act(
                         next unless -20 < $b.pos.im - $pos.im < 20;
 
                         my $posdiff   = ($pos - $b.pos);
-                        my $distance = $posdiff.abs;
+                        my $distance  = $posdiff.abs;
                         if $distance < 35 {
-                            if $_.HP == 0 {
+                            if $_.HP <= 0 {
                                 $_.lifetime = 2e0;
-                                $vel += $b.vel / 4;
-                                $vel *= 4;
-                                if 100.rand < REFRACT_PROB && @bullets < 50 {
+                                if 100.rand < REFRACT_PROB {
                                     for ^4 {
                                         @bullets.push:
-                                            Object.new: :pos($b.pos), :vel(unpolar(768, (2 * π).rand));
+                                            Object.new: :pos($b.pos),
+                                                        :vel(unpolar(768, (6 * π).rand.Int / 3)),
+                                                        :lifetime(3e0);
                                     }
                                 }
+                                $vel += $b.vel / 4;
+                                $vel *= 4;
                                 @kills.push($_);
                                 $explosion_background = 0.9 + 0.1.rand;
                             } elsif $_.HP > 0 {
                                 next if $_.HP <= 2 && $distance >= 25;
                                 $_.HP--;
                                 my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
-                                $vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
+                                #$vel *= 0.7;
+                                $vel += $posdiff * 10;
                                 if $_.HP >= 2 {
                                     @shieldbounces.push:
                                         Object.new: :$pos,
@@ -227,7 +247,7 @@ $app.g_timeout(1000 / 50).act(
                     }
                 }
 
-                if ($player.pos - $_.pos).abs < 40 {
+                if ($player.pos - $_.pos).abs < 35 {
                     $player.lifetime //= 3e0;
                     $explosion_background = 1e0;
                 }
@@ -298,23 +318,56 @@ sub playership($ctx, $ship) {
         $ctx.line_to(0, 1);
         $ctx.stroke();
     } else {
-        $ctx.scale(0.2, 0.2);
-        $ctx.line_width = 8;
-        $ctx.rgb(1, 1, 1);
+        given $ctx {
+            my $polarvel = $ship.vel.polar;
+            .rotate($polarvel[1] - 0.5 * π);
+            .scale(0.5, 0.5);
+            .line_width = 4;
+            .rgb(1, 1, 1);
 
-        $ctx.move_to(0, -64);
-        $ctx.line_to(32, 32);
-        $ctx.curve_to(20, 16, -20, 16, -32, 32);
-        $ctx.close_path();
-        $ctx.stroke :preserve;
-        $ctx.rgb(0.25, 0.25, 0.25);
-        $ctx.fill;
+            .memoize_path(state $playerpath,
+            {
+                .move_to(-1, -29);
+                .line_to(0, -8) :relative;
+                .line_to(2, 0) :relative;
+                .line_to(0, 8) :relative;
+                .close_path();
+
+                .move_to(5, -30);
+                for ( -10, 0,  -5, 5,  -5, 20,  5, 5,  -10, 10,  -15, -5,
+                      0, -20,  -2, 0,   0, 35,  22, 5,  0, -5,  30, 0,  0, 5,  22, -5,
+                      0, -35,  -2, 0,  0, 20,  -15, 5,  -10, -10,  5, -5,  -5, -20) -> $x, $y {
+                    .line_to($x, $y) :relative;
+                }
+                .close_path();
+                $playerpath = .copy_path();
+            });
+
+            .stroke() :preserve;
+            .rgb(0.75, 0.75, 0.75);
+            .fill();
+
+            .rgb(0.5, 0.5, 0.5);
+
+            .move_to(6, -5);
+            .line_to(-12, 0) :relative;
+            .line_to(-1, -6) :relative;
+            .line_to(3, -10) :relative;
+            .line_to(9, 0) :relative;
+            .line_to(3, 10) :relative;
+            .close_path();
+
+            .stroke() :preserve;
+            .rgb(0.2, 0.2, 0.2);
+            .fill();
+        }
     }
     CATCH {
         say $_
     }
 }
 
+my %damagepatterns;
 sub enemyship($ctx, $ship) {
     if $ship.lifetime {
         $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
@@ -348,28 +401,31 @@ sub enemyship($ctx, $ship) {
                 $ctx.line_to(0, -13 -(1 / $_) * 50);
                 $ctx.stroke();
             }
-            if $ship.HP < 2 {
-                $ctx.push_group();
-                $ctx.rgb(1, 1, 1);
-                $ctx.rectangle(-20, -20, 40, 40);
-                $ctx.fill();
-                $ctx.rgb(0, 0, 0);
+        }
+        if $ship.HP < 2 {
+            $ctx.push_group();
+            $ctx.rgb(1, 1, 1);
+            $ctx.rectangle(-20, -20, 40, 40);
+            $ctx.fill();
+            $ctx.rgb(0, 0, 0);
+            $ctx.memoize_path((%damagepatterns){$ship.id % 256}{$ship.HP},
+            {
                 for ^(1 max (2 - $ship.HP)) {
                     my $dir = (($ship.id + $_ * 1311) % 98) / 49 * π;
                     my $w = 0.3 + ($ship.id % 53) / 97;
-                    my $a = unpolar(30, $dir - $w);
-                    my $b = unpolar(30, $dir + $w);
-                    $ctx.move_to($a.re * 0.1, $a.im * 0.1);
+                    my $a = unpolar(40, $dir - $w);
+                    my $b = unpolar(40, $dir + $w);
+                    $ctx.move_to($a.re * 0.05, $a.im * 0.05);
                     $ctx.line_to($a.re, $a.im);
                     $ctx.line_to($b.re, $b.im);
-                    $ctx.line_to($b.re * 0.1, $b.im * 0.1);
+                    $ctx.line_to($b.re * 0.05, $b.im * 0.05);
                     $ctx.close_path();
                 }
-                $ctx.operator = OPERATOR_XOR;
-                $ctx.fill();
-                $ctx.operator = OPERATOR_OVER;
-                $damagemask = $ctx.pop_group();
-            }
+            }) :flat;
+            $ctx.operator = OPERATOR_XOR;
+            $ctx.fill();
+            $ctx.operator = OPERATOR_OVER;
+            $damagemask = $ctx.pop_group();
         }
 
         if $damagemask {
@@ -378,19 +434,25 @@ sub enemyship($ctx, $ship) {
 
         $ctx.line_width = 1;
         $ctx.rgb(((my int $id = $ship.id) % 100) / 100, ($id % 75) / 75, ($id % 13) / 13);
-        $ctx.move_to(5, -15);
-        $ctx.line_to(-5, -15);
-        $ctx.curve_to(-30, -15, -15, 15, -5, 15);
-        $ctx.line_to(-3, -5);
-        $ctx.line_to(0, 5);
-        $ctx.line_to(3, -5);
-        $ctx.line_to(5, 15);
-        $ctx.curve_to(15, 15, 30, -15, 5, -15);
-        $ctx.line_to(5, -15);
 
-        $ctx.line_to(0, -5) :relative;
-        $ctx.line_to(-10, 0) :relative;
-        $ctx.line_to(0, 5) :relative;
+        $ctx.memoize_path(state $enemypath,
+        {
+            $ctx.move_to(5, -15);
+            $ctx.line_to(-5, -15);
+            $ctx.curve_to(-30, -15, -15, 15, -5, 15);
+            $ctx.line_to(-3, -5);
+            $ctx.line_to(0, 5);
+            $ctx.line_to(3, -5);
+            $ctx.line_to(5, 15);
+            $ctx.curve_to(15, 15, 30, -15, 5, -15);
+            $ctx.line_to(5, -15);
+
+            $ctx.line_to(0, -5) :relative;
+            $ctx.line_to(-10, 0) :relative;
+            $ctx.line_to(0, 5) :relative;
+
+            $enemypath = $ctx.copy_path() :flat;
+        });
 
         $ctx.fill() :preserve;
         $ctx.rgb(1, 1, 1);
@@ -503,24 +565,24 @@ $game_draw_handler = $da.add_draw_handler(
         $ctx.restore();
 
         $ctx.save();
-        $ctx.rgba(0, 0, 1, 0.75);
         $ctx.line_width = 8;
 
         for @bullets {
+            $ctx.rgba(0, 0, 1, $_.lifetime min 0.75);
             $ctx.move_to($_.pos.re, $_.pos.im);
-            $ctx.line_to($_.vel.re * 0.05, $_.vel.im * 0.05) :relative;
+            $ctx.line_to($_.vel.re * 0.02, $_.vel.im * 0.02) :relative;
+            $ctx.stroke();
         }
-        $ctx.stroke();
-        $ctx.rgb(1, 1, 1);
         $ctx.line_width = 3;
 
         for @bullets {
             my $vel := $_.vel;
+            $ctx.rgba(1, 1, 1, $_.lifetime min 1);
             $ctx.move_to($_.pos.re, $_.pos.im);
-            $ctx.move_to($vel.re * 0.01, $vel.im * 0.01) :relative;
-            $ctx.line_to($vel.re * 0.03, $vel.im * 0.03) :relative;
+            $ctx.move_to($vel.re * 0.005, $vel.im * 0.005) :relative;
+            $ctx.line_to($vel.re * 0.015, $vel.im * 0.015) :relative;
+            $ctx.stroke();
         }
-        $ctx.stroke();
         $ctx.restore();
 
         for @enemies {
