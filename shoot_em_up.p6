@@ -44,9 +44,6 @@ constant SCALE = (SCREEN_W / W) min (SCREEN_H / H);
 constant LETTERBOX_LEFT = (SCREEN_W - W * SCALE) / 2;
 constant LETTERBOX_TOP  = (SCREEN_H - H * SCALE) / 2;
 
-say W * SCALE;
-say H * SCALE;
-
 my $game_draw_handler;
 
 $app.size_request(SCREEN_W, SCREEN_H);
