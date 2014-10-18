@@ -166,41 +166,43 @@ $app.g_timeout(1000 / 50).act(
         @bullets .= grep(
             -> $b {
                 my $p = $b.pos;
-                0 < $b.pos.re < W
-                and 0 < $b.pos.im < H
+                0 < $p.re < W
+                and 0 < $p.im < H
         });
 
         for @enemies {
-            if $_.pos.re < 15 && $_.vel.re < 0 {
-                $_.vel = -$_.vel.re + $_.vel.im\i
+            my $vel := $_.vel;
+            my $pos := $_.pos;
+            if $pos.re < 15 && $vel.re < 0 {
+                $vel = -$vel.re + $vel.im\i
             }
-            if $_.pos.re > W - 15 && $_.vel.re > 0 {
-                $_.vel = -$_.vel.re + $_.vel.im\i
+            if $pos.re > W - 15 && $vel.re > 0 {
+                $vel = -$vel.re + $vel.im\i
             }
-            if !defined $_.lifetime && $_.vel.im < 182 {
-                $_.vel += ($dt * 100)\i;
-                my $polarvel = $_.vel.polar;
-                $_.vel = unpolar($polarvel[0] min 182, $polarvel[1]);
+            if !defined $_.lifetime && $vel.im < 182 {
+                $vel += ($dt * 100)\i;
+                my $polarvel = $vel.polar;
+                $vel = unpolar($polarvel[0] min 182, $polarvel[1]);
             }
 
-            $_.pos += $dt * $_.vel;
+            $pos += $dt * $vel;
 
             if $_.lifetime {
                 $_.lifetime -= $dt;
-                $_.vel *= 0.8;
+                $vel *= 0.8;
             } else {
                 if !defined $player.lifetime {
                     for @bullets -> $b {
-                        next unless -20 < $b.pos.re - $_.pos.re < 20;
-                        next unless -20 < $b.pos.im - $_.pos.im < 20;
+                        next unless -20 < $b.pos.re - $pos.re < 20;
+                        next unless -20 < $b.pos.im - $pos.im < 20;
 
-                        my $posdiff   = ($_.pos - $b.pos);
+                        my $posdiff   = ($pos - $b.pos);
                         my $polardiff = $posdiff.polar;
                         if $polardiff[0] < 35 {
                             if $_.HP == 0 {
                                 $_.lifetime = 2e0;
-                                $_.vel += $b.vel / 4;
-                                $_.vel *= 4;
+                                $vel += $b.vel / 4;
+                                $vel *= 4;
                                 if 100.rand < REFRACT_PROB && @bullets < 50 {
                                     for ^4 {
                                         @bullets.push:
@@ -213,7 +215,7 @@ $app.g_timeout(1000 / 50).act(
                                 next if $_.HP <= 2 && $polardiff >= 25;
                                 $_.HP--;
                                 my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
-                                $_.vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
+                                $vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
                                 if $_.HP >= 2 {
                                     @shieldbounces.push:
                                         Object.new: :pos($_.pos),
@@ -233,7 +235,7 @@ $app.g_timeout(1000 / 50).act(
                 }
             }
         }
-        @enemies .= grep({ $_.pos.im < H + 30 && (!$_.lifetime || $_.lifetime > 0) });
+        @enemies .= grep({ $_.pos.im < H + 30 && (($_.lifetime // 1) > 0) });
         @shieldbounces.shift while @shieldbounces and @shieldbounces[0].lifetime <= 0;
 
         if 100.rand < ENEMY_PROB && @enemies < 100 {
