@@ -218,8 +218,8 @@ $app.g_timeout(1000 / 50).act(
                                 $vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
                                 if $_.HP >= 2 {
                                     @shieldbounces.push:
-                                        Object.new: :pos($_.pos),
-                                                    :vel($_.vel),
+                                        Object.new: :$pos,
+                                                    :$vel,
                                                     :lifetime(0.25e0);
                                 }
                             }
