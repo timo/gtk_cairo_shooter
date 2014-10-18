@@ -197,8 +197,8 @@ $app.g_timeout(1000 / 50).act(
                         next unless -20 < $b.pos.im - $pos.im < 20;
 
                         my $posdiff   = ($pos - $b.pos);
-                        my $polardiff = $posdiff.polar;
-                        if $polardiff[0] < 35 {
+                        my $distance = $posdiff.abs;
+                        if $distance < 35 {
                             if $_.HP == 0 {
                                 $_.lifetime = 2e0;
                                 $vel += $b.vel / 4;
@@ -212,7 +212,7 @@ $app.g_timeout(1000 / 50).act(
                                 @kills.push($_);
                                 $explosion_background = 0.9 + 0.1.rand;
                             } elsif $_.HP > 0 {
-                                next if $_.HP <= 2 && $polardiff >= 25;
+                                next if $_.HP <= 2 && $distance >= 25;
                                 $_.HP--;
                                 my $bumpdiff = unpolar(1, ($posdiff - 30i).polar[1]);
                                 $vel += $bumpdiff * ($_.HP > 2 ?? 25 !! 200) - 96i;
@@ -229,7 +229,7 @@ $app.g_timeout(1000 / 50).act(
                     }
                 }
 
-                if ($player.pos - $_.pos).polar[0] < 40 {
+                if ($player.pos - $_.pos).abs < 40 {
                     $player.lifetime //= 3e0;
                     $explosion_background = 1e0;
                 }
