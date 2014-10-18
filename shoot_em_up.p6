@@ -56,11 +56,11 @@ my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
         -> $ctx {
             $ctx.line_cap = LINE_CAP_ROUND;
-            $ctx.rgba(1, 1, 1, 1);
+            $ctx.rgba(1, 1, 1, 1 - $chunk * 0.2);
 
             for ^CHUNKSIZE {
-                my $star_x = W.rand.Int;
-                my $star_y = H.rand.Int;
+                my $star_x = SCREEN_W.rand.Int;
+                my $star_y = SCREEN_H.rand.Int;
                 $ctx.move_to($star_x, $star_y);
                 $ctx.line_to(0, 0, :relative);
                 $ctx.move_to($star_x, $star_y + H);
@@ -69,7 +69,7 @@ my @star_surfaces = do for ^4 -> $chunk {
             $ctx.stroke;
 
             $tgt;
-        }, SCREEN_W, 2 * SCREEN_H, FORMAT_A8);
+        }, SCREEN_W, 2 * SCREEN_H, FORMAT_ARGB32);
     }
 
 my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i) );
@@ -343,8 +343,8 @@ sub enemyship($ctx, $ship) {
         $ctx.scale(0.8, 0.8);
 
         if ($player.lifetime // 2) > 0 {
-            $ctx.line_cap = LINE_CAP_ROUND;
-            for ^4 {
+            #$ctx.line_cap = LINE_CAP_ROUND;
+            for 1..3 {
                 $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
                 $ctx.line_width = $_ * $_;
                 $ctx.move_to(0, -13);
@@ -380,7 +380,7 @@ sub enemyship($ctx, $ship) {
         }
 
         $ctx.line_width = 1;
-        $ctx.rgb(($ship.id % 100) / 100, ($ship.id % 75) / 75, ($ship.id % 13) / 13);
+        $ctx.rgb(((my int $id = $ship.id) % 100) / 100, ($id % 75) / 75, ($id % 13) / 13);
         $ctx.move_to(5, -15);
         $ctx.line_to(-5, -15);
         $ctx.curve_to(-30, -15, -15, 15, -5, 15);
@@ -497,9 +497,11 @@ $game_draw_handler = $da.add_draw_handler(
                      (nqp::time_n() *  15) % H - H;
 
         $ctx.save();
+        $ctx.scale(1 / SCALE, 1 / SCALE);
         for ^4 {
-            $ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
-            $ctx.mask(@star_surfaces[$_], 0, @yoffs[$_]);
+            #$ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
+            $ctx.set_source_surface(@star_surfaces[$_], 0, @yoffs[$_]);
+            $ctx.paint();
         }
         $ctx.restore();
 
@@ -570,21 +572,24 @@ $game_draw_handler = $da.add_draw_handler(
         $ctx.line_to(10 + @bullets * 5, 30);
         $ctx.stroke;
 
-        #if @frametimes > 50 {
-            #$ctx.rgb(1, 1, 1);
-            #for 1..50 {
-                #my int $pos = @frametimes - $_;
-                #$ctx.move_to(10, 40 + $_ * 3);
-                #$ctx.line_to(10 + 1 / (@frametimes[$pos]), 40 + $_ * 3);
-            #}
-            #$ctx.stroke;
-        #}
+        if @frametimes > 50 {
+            $ctx.rgb(1, 1, 1);
+            for 1..50 {
+                my int $pos = @frametimes - $_;
+                $ctx.move_to(10, 40 + $_ * 3);
+                $ctx.line_to(10 + 1 / (@frametimes[$pos]), 40 + $_ * 3);
+            }
+            $ctx.stroke;
+        }
 
         @frametimes.push: nqp::time_n() - $framestart;
 
-        nqp::force_gc() if 2.rand.Int;
+        if 2.rand < 1 {
+            my $gcstart = nqp::time_n();
+            nqp::force_gc();
 
-        @gctimes.push: nqp::time_n() - $framestart;
+            @gctimes.push: nqp::time_n() - $gcstart;
+        }
 
         CATCH {
             say $_
@@ -594,7 +599,7 @@ $game_draw_handler = $da.add_draw_handler(
 $app.run();
 
 say "analysis of frame times incoming";
-for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes, $(@gctimes Z- @frametimes) -> @times is copy {
+for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes, $(@gctimes) -> @times is copy {
     say "----";
     say <<"calculation times" "rendering times" "complete times" "GC times">>[(state $)++];
     @times .= sort;
