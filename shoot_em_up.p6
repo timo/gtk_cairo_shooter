@@ -127,6 +127,7 @@ my $explosion_background = 0;
 
 my $go_t;
 my $framestart;
+my @calctimes;
 $app.g_timeout(1000 / 50).act(
     -> @ ($t, $dt) {
         $framestart = nqp::time_n();
@@ -246,6 +247,8 @@ $app.g_timeout(1000 / 50).act(
         }
 
         $da.queue_draw;
+
+        @calctimes.push: nqp::time_n() - $framestart;
 
         CATCH {
             say $_
@@ -466,6 +469,8 @@ sub game_over_screen($widget, $ctx) {
     }
     $ctx.fill();
 
+    @frametimes.push: nqp::time_n() - $framestart;
+
     CATCH {
         say $_
     }
@@ -555,11 +560,14 @@ $game_draw_handler = $da.add_draw_handler(
 $app.run();
 
 say "analysis of frame times incoming";
-@frametimes .= sort;
+for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes -> @times is copy {
+    say "----";
+    say <<"calculation times" "rendering times" "complete times">>[(state $)++];
+    @times .= sort;
 
-say "{+@frametimes} frames rendered";
-my @timings = (@frametimes[* div 50], @frametimes[* div 4], @frametimes[* div 2], @frametimes[* * 3 div 4], @frametimes[* - * div 100]);
-say @timings;
+    my @timings = (@times[* div 50], @times[* div 4], @times[* div 2], @times[* * 3 div 4], @times[* - * div 100]);
 
-say "frames per second:";
-say 1 X/ @timings;
+    say "frames per second:";
+    say (1 X/ @timings).fmt("%.3f");
+    say "";
+}
