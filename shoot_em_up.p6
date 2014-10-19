@@ -55,7 +55,7 @@ my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
         -> $ctx {
             $ctx.line_cap = LINE_CAP_ROUND;
-            $ctx.rgba(1, 1, 1, 1 - $chunk * 0.2);
+            $ctx.rgb(my $val = 1 - $chunk * 0.2, $val, $val);
 
             for ^CHUNKSIZE {
                 my $star_x = SCREEN_W.rand.Int;
@@ -68,7 +68,7 @@ my @star_surfaces = do for ^4 -> $chunk {
             $ctx.stroke;
 
             $tgt;
-        }, SCREEN_W, 2 * SCREEN_H, FORMAT_ARGB32);
+        }, SCREEN_W, 2 * SCREEN_H, FORMAT_RGB24);
     }
 
 my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i), :vel(10i) );
@@ -556,12 +556,14 @@ $game_draw_handler = $da.add_draw_handler(
                      (nqp::time_n() *  15) % SCREEN_H - SCREEN_H;
 
         $ctx.save();
+        $ctx.operator = OPERATOR_ADD;
         $ctx.scale(1 / SCALE, 1 / SCALE);
         for ^4 {
             #$ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
             $ctx.set_source_surface(@star_surfaces[$_], 0, @yoffs[$_]);
             $ctx.paint();
         }
+        $ctx.operator = OPERATOR_OVER;
         $ctx.restore();
 
         $ctx.save();
