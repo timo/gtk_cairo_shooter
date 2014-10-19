@@ -538,6 +538,7 @@ sub game_over_screen($widget, $ctx) {
 
 $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
+        my $render_start_time = nqp::time_n();
         $ctx.antialias = ANTIALIAS_FAST;
         $ctx.save();
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
@@ -620,30 +621,30 @@ $game_draw_handler = $da.add_draw_handler(
         }
 
         #$ctx.line_width = 1;
-        $ctx.rgb(1, 0, 0);
-        $ctx.move_to(10, 10);
-        $ctx.line_to(10 + @enemies * 5, 10);
-        $ctx.stroke;
-        $ctx.rgb(0, 1, 0);
-        $ctx.move_to(10, 20);
-        $ctx.line_to(10 + @shieldbounces * 5, 20);
-        $ctx.stroke;
-        $ctx.rgb(0, 0, 1);
-        $ctx.move_to(10, 30);
-        $ctx.line_to(10 + @bullets * 5, 30);
-        $ctx.stroke;
+        #$ctx.rgb(1, 0, 0);
+        #$ctx.move_to(10, 10);
+        #$ctx.line_to(10 + @enemies * 5, 10);
+        #$ctx.stroke;
+        #$ctx.rgb(0, 1, 0);
+        #$ctx.move_to(10, 20);
+        #$ctx.line_to(10 + @shieldbounces * 5, 20);
+        #$ctx.stroke;
+        #$ctx.rgb(0, 0, 1);
+        #$ctx.move_to(10, 30);
+        #$ctx.line_to(10 + @bullets * 5, 30);
+        #$ctx.stroke;
 
-        if @frametimes > 50 {
-            $ctx.rgb(1, 1, 1);
-            for 1..50 {
-                my int $pos = @frametimes - $_;
-                $ctx.move_to(10, 40 + $_ * 3);
-                $ctx.line_to(10 + 1 / (@frametimes[$pos]), 40 + $_ * 3);
-            }
-            $ctx.stroke;
-        }
+        #if @frametimes > 50 {
+            #$ctx.rgb(1, 1, 1);
+            #for 1..50 {
+                #my int $pos = @frametimes - $_;
+                #$ctx.move_to(10, 40 + $_ * 3);
+                #$ctx.line_to(10 + 1 / (@frametimes[$pos]), 40 + $_ * 3);
+            #}
+            #$ctx.stroke;
+        #}
 
-        @frametimes.push: nqp::time_n() - $framestart;
+        @frametimes.push: nqp::time_n() - $render_start_time;
 
         if 2.rand < 1 {
             my $gcstart = nqp::time_n();
@@ -660,7 +661,7 @@ $game_draw_handler = $da.add_draw_handler(
 $app.run();
 
 say "analysis of frame times incoming";
-for $@calctimes, $(@frametimes Z- @calctimes), $@frametimes, $(@gctimes) -> @times is copy {
+for $@calctimes, $@frametimes, $(@frametimes Z+ @calctimes), $@gctimes -> @times is copy {
     say "----";
     say <<"calculation times" "rendering times" "complete times" "GC times">>[(state $)++];
     @times .= sort;
