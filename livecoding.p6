@@ -8,10 +8,15 @@ gtk_simple_use_cairo;
 sub MAIN($filename? is copy) {
     my GTK::Simple::App $app .= new: title => "Cairo Live-Coding environment";
 
+    $app.border_width = 10;
+
     $app.set_content(
         GTK::Simple::VBox.new(
             GTK::Simple::HBox.new(
-                my $codeview = GTK::Simple::TextView.new(),
+                GTK::Simple::VBox.new(
+                    my $codeview = GTK::Simple::TextView.new(),
+                    my $fps_toggle = GTK::Simple::ToggleButton.new(label => "slow mode"),
+                ),
                 my $da       = GTK::Simple::DrawingArea.new()
             ),
             my $statuslabel = GTK::Simple::Label.new(text => "ready when you are.")
@@ -51,11 +56,18 @@ sub MAIN($filename? is copy) {
             &frame_handler = &frame_callable;
         });
 
+    my $frame_number;
+    my $fast_mode = True;
+
+    $fps_toggle.toggled.act(-> $w { $fast_mode = not $w.status; say $fast_mode });
+
     $app.g_timeout(1000 / 25).act(
         -> @ ($t, $dt) {
-            $animation_last_t  = $t;
-            $animation_last_dt = $dt;
-            $da.queue_draw;
+            if ++$frame_number %% 4 or $fast_mode {
+                $animation_last_t  = $t;
+                $animation_last_dt = $dt;
+                $da.queue_draw;
+            }
 
             CATCH {
                 say $_;
