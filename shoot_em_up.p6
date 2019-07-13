@@ -1,9 +1,88 @@
-use GTK::Simple;
-use GTK::GDK;
+use GTK::Simple::App;
+use GTK::Simple::DrawingArea;
+use GTK::Simple::HBox;
 use Cairo;
 use NativeCall;
 
+use nqp;
+
 gtk_simple_use_cairo;
+
+use GTK::Simple::NativeLib;
+
+our class GdkWindow is repr('CPointer') { }
+
+enum EVENT_MASK is export (
+  EXPOSURE_MASK => 2,
+  POINTER_MOTION_MASK => 4,
+  POINTER_MOTION_HINT_MASK => 8,
+  BUTTON_MOTION_MASK => 16,
+  BUTTON1_MOTION_MASK => 32,
+  BUTTON2_MOTION_MASK => 64,
+  BUTTON3_MOTION_MASK => 128,
+  BUTTON_PRESS_MASK => 256,
+  BUTTON_RELEASE_MASK => 512,
+  KEY_PRESS_MASK => 1024,
+  KEY_RELEASE_MASK => 2048,
+  ENTER_NOTIFY_MASK => 4096,
+  LEAVE_NOTIFY_MASK => 8192,
+  FOCUS_CHANGE_MASK => 16384,
+  STRUCTURE_MASK => 32768,
+  PROPERTY_CHANGE_MASK => 65536,
+  VISIBILITY_NOTIFY_MASK => 131072,
+  PROXIMITY_IN_MASK => 262144,
+  PROXIMITY_OUT_MASK => 524288,
+  SUBSTRUCTURE_MASK => 1048576,
+  SCROLL_MASK => 2097152,
+  ALL_EVENTS_MASK => 4194302,
+);
+
+constant carrayuint16 := CArray[uint16];
+
+sub gtk_widget_get_window(OpaquePointer $window)
+    returns GdkWindow
+    is native(&gtk-lib)
+    is export
+    {*}
+
+sub gdk_window_get_events(GdkWindow $window)
+    returns int32
+    is native(&gdk-lib)
+    is export
+    {*}
+
+sub gdk_window_set_events(GdkWindow $window, int32 $eventmask)
+    is native(&gdk-lib)
+    is export
+    {*}
+
+# GdkEvent datastructure access {{{
+
+our class GdkEvent is repr('CPointer') is export { ... }
+
+sub gdk_event_get_keycode(GdkEvent $event, carrayuint16 $keycode)
+    is native(&gdk-lib)
+    {*}
+
+sub gdk_event_get_keyval(GdkEvent $event, carrayuint16 $keycode)
+    is native(&gdk-lib)
+    {*}
+
+our class GdkEvent is export {
+    method keycode {
+        my carrayuint16 $tgt .= new;
+        $tgt[0] = 0;
+        gdk_event_get_keycode(self, $tgt);
+        $tgt[0]
+    }
+
+    method keyval {
+        my carrayuint16 $tgt .= new;
+        $tgt[0] = 0;
+        gdk_event_get_keyval(self, $tgt);
+        $tgt[0]
+    }
+}
 
 class Object is rw {
     has Complex $.pos;
@@ -18,7 +97,7 @@ class Enemy is Object is rw {
 
 my GTK::Simple::App $app .= new: title => "A totally cool shooter game!";
 
-$app.set_content(
+$app.set-content(
     GTK::Simple::HBox.new(
         my $da = GTK::Simple::DrawingArea.new(),
         GTK::Simple::DrawingArea.new()
@@ -54,7 +133,7 @@ $app.size_request(SCREEN_W, SCREEN_H);
 my @star_surfaces = do for ^4 -> $chunk {
         my $tgt = Cairo::Image.record(
         -> $ctx {
-            $ctx.line_cap = LINE_CAP_ROUND;
+            $ctx.line_cap = Cairo::LINE_CAP_ROUND;
             $ctx.rgb(my $val = 1 - $chunk * 0.2, $val, $val);
 
             for ^CHUNKSIZE {
@@ -68,7 +147,7 @@ my @star_surfaces = do for ^4 -> $chunk {
             $ctx.stroke;
 
             $tgt;
-        }, SCREEN_W, 2 * SCREEN_H, FORMAT_RGB24);
+        }, SCREEN_W, 2 * SCREEN_H, Cairo::FORMAT_RGB24);
     }
 
 my $player = Object.new( :pos(H / 2 + (H * 6 / 7)\i), :vel(10i) );
@@ -139,7 +218,7 @@ $app.g_timeout(1000 / 50).act(
                 if $game_draw_handler.connected {
                     $game_draw_handler.disconnect();
                     $da.add_draw_handler(&game_over_screen);
-                    @kills>>.lifetime = Num;
+                    @kills.map({ .lifetime = Num });
                     .HP = 0 for @kills;
                     $go_t = nqp::time_n();
                 }
@@ -296,7 +375,7 @@ sub playership($ctx, $ship) {
             $ctx.line_to(sin($pic + π * 2 / 20) * 0.3, cos($pic + π * 2 / 20) * 0.3);
         }
         $ctx.line_to(0, 1);
-        $ctx.operator = OPERATOR_XOR;
+        $ctx.operator = Cairo::OPERATOR_XOR;
         $ctx.fill();
 
         $ctx.pop_group_to_source();
@@ -304,7 +383,7 @@ sub playership($ctx, $ship) {
 
         $ctx.restore();
 
-        $ctx.operator = OPERATOR_OVER;
+        $ctx.operator = Cairo::OPERATOR_OVER;
         $ctx.rgb(1, 1, 1);
         $ctx.scale($rad, $rad);
         $ctx.line_width = 1 / $rad;
@@ -393,7 +472,7 @@ sub enemyship($ctx, $ship) {
         $ctx.scale(0.8, 0.8);
 
         if ($player.lifetime // 2) > 0 {
-            #$ctx.line_cap = LINE_CAP_ROUND;
+            #$ctx.line_cap = Cairo::LINE_CAP_ROUND;
             for 1..3 {
                 $ctx.rgba(0, 0, 1, 0.4.rand + 0.1);
                 $ctx.line_width = $_ * $_;
@@ -402,35 +481,35 @@ sub enemyship($ctx, $ship) {
                 $ctx.stroke();
             }
         }
-        if $ship.HP < 2 {
-            $ctx.push_group();
-            $ctx.rgb(1, 1, 1);
-            $ctx.rectangle(-20, -20, 40, 40);
-            $ctx.fill();
-            $ctx.rgb(0, 0, 0);
-            $ctx.memoize_path((%damagepatterns){$ship.id % 256}{$ship.HP},
-            {
-                for ^(1 max (2 - $ship.HP)) {
-                    my $dir = (($ship.id + $_ * 1311) % 98) / 49 * π;
-                    my $w = 0.3 + ($ship.id % 53) / 97;
-                    my $a = unpolar(40, $dir - $w);
-                    my $b = unpolar(40, $dir + $w);
-                    $ctx.move_to($a.re * 0.05, $a.im * 0.05);
-                    $ctx.line_to($a.re, $a.im);
-                    $ctx.line_to($b.re, $b.im);
-                    $ctx.line_to($b.re * 0.05, $b.im * 0.05);
-                    $ctx.close_path();
-                }
-            }) :flat;
-            $ctx.operator = OPERATOR_XOR;
-            $ctx.fill();
-            $ctx.operator = OPERATOR_OVER;
-            $damagemask = $ctx.pop_group();
-        }
+        #if $ship.HP < 2 {
+            #$ctx.push_group();
+            #$ctx.rgb(1, 1, 1);
+            #$ctx.rectangle(-20, -20, 40, 40);
+            #$ctx.fill();
+            #$ctx.rgb(0, 0, 0);
+            #$ctx.memoize_path((%damagepatterns){$ship.id % 256}{$ship.HP},
+            # {
+                #for ^(1 max (2 - $ship.HP)) {
+                    #my $dir = (($ship.id + $_ * 1311) % 98) / 49 * π;
+                    #my $w = 0.3 + ($ship.id % 53) / 97;
+                    #my $a = unpolar(40, $dir - $w);
+                    #my $b = unpolar(40, $dir + $w);
+                    #$ctx.move_to($a.re * 0.05, $a.im * 0.05);
+                    #$ctx.line_to($a.re, $a.im);
+                    #$ctx.line_to($b.re, $b.im);
+                    #$ctx.line_to($b.re * 0.05, $b.im * 0.05);
+                    #$ctx.close_path();
+                #}
+            #}) :flat;
+            #$ctx.operator = Cairo::OPERATOR_XOR;
+            #$ctx.fill();
+            #$ctx.operator = Cairo::OPERATOR_OVER;
+            #$damagemask = $ctx.pop_group();
+        #}
 
-        if $damagemask {
-            $ctx.push_group();
-        }
+        #if $damagemask {
+            #$ctx.push_group();
+        #}
 
         $ctx.line_width = 1;
         $ctx.rgb(((my int $id = $ship.id) % 100) / 100, ($id % 75) / 75, ($id % 13) / 13);
@@ -458,11 +537,11 @@ sub enemyship($ctx, $ship) {
         $ctx.rgb(1, 1, 1);
         $ctx.stroke();
 
-        if $damagemask {
-            $ctx.pop_group_to_source();
-            $ctx.mask($damagemask);
-            $damagemask.destroy();
-        }
+        #if $damagemask {
+            #$ctx.pop_group_to_source();
+            #$ctx.mask($damagemask);
+            #$damagemask.destroy();
+        #}
     }
 }
 
@@ -497,7 +576,7 @@ sub game_over_screen($widget, $ctx) {
         my $kill = @kills[$_];
         next unless defined $kill;
         my $maybe = (nqp::time_n() - $go_t) * 3 - ($kill.id % ($edgelength * 3)) / 3;
-        #$maybe min= 1;
+        $maybe min= 1;
         if $maybe >= 0 {
             $ctx.save();
             $ctx.translate(50 * ($_ % $edgelength), 50 * ($_ div $edgelength));
@@ -539,7 +618,7 @@ sub game_over_screen($widget, $ctx) {
 $game_draw_handler = $da.add_draw_handler(
     -> $widget, $ctx {
         my $render_start_time = nqp::time_n();
-        $ctx.antialias = ANTIALIAS_FAST;
+        $ctx.antialias = Cairo::ANTIALIAS_FAST;
         $ctx.save();
         $ctx.translate(LETTERBOX_LEFT, LETTERBOX_TOP);
         $ctx.scale(SCALE, SCALE);
@@ -557,14 +636,14 @@ $game_draw_handler = $da.add_draw_handler(
                      (nqp::time_n() *  15) % SCREEN_H - SCREEN_H;
 
         $ctx.save();
-        $ctx.operator = OPERATOR_ADD;
+        $ctx.operator = Cairo::OPERATOR_ADD;
         $ctx.scale(1 / SCALE, 1 / SCALE);
         for ^4 {
             #$ctx.rgba(1, 1, 1, 1 - $_ * 0.2);
             $ctx.set_source_surface(@star_surfaces[$_], 0, @yoffs[$_]);
             $ctx.paint();
         }
-        $ctx.operator = OPERATOR_OVER;
+        $ctx.operator = Cairo::OPERATOR_OVER;
         $ctx.restore();
 
         $ctx.save();
